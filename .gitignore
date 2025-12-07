@@ -44,5 +44,13 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-#configuraciones
+# Configuraciones sensibles - NO subir a Git
 lib/firebase_options.dart
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+firebase.json
+
+# Variables de entorno
+.env
+.env.*
+!.env.example
