@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1092575114936",
+    "project_id": "upsglam-malo-romero-saquicela",
+    "storage_bucket": "upsglam-malo-romero-saquicela.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1092575114936:android:6c779689cd40405dda264d",
+        "android_client_info": {
+          "package_name": "com.parallel.computing.app.v2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBnSbTVjoFsD-A0ksTkxqDQ4MbTRbxMdZM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
