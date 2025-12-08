@@ -3,6 +3,7 @@ import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../widgets/buttons/primary_button.dart';
 import '../../widgets/effects/gradient_background.dart';
+import '../auth/login_screen.dart';
 
 /// Pantalla de bienvenida institucional UPS.
 class WelcomeScreen extends StatelessWidget {
@@ -43,7 +44,10 @@ class WelcomeScreen extends StatelessWidget {
                 PrimaryButton(
                   label: 'Continuar',
                   onPressed: () {
-                    // TODO: Navegación a login
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    );
                   },
                 ),
               ],
