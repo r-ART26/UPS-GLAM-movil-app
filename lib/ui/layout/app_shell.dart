@@ -22,24 +22,38 @@ class AppShell extends StatelessWidget {
     final location = GoRouterState.of(context).uri.toString();
     final currentIndex = _locationToIndex(location);
 
-    return Scaffold(
-      body: child,
-
-      bottomNavigationBar: BottomNavBar(
-        currentIndex: currentIndex,
-        onTabSelected: (index) {
-          switch (index) {
-            case 0:
-              context.go('/home/feed');
-              break;
-            case 1:
-              context.go('/home/post/new');
-              break;
-            case 2:
-              context.go('/home/profile');
-              break;
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          // Si hay historial, hacer pop
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            // Si no hay historial, ir al feed (pantalla principal)
+            context.go('/home/feed');
           }
-        },
+        }
+      },
+      child: Scaffold(
+        body: child,
+
+        bottomNavigationBar: BottomNavBar(
+          currentIndex: currentIndex,
+          onTabSelected: (index) {
+            switch (index) {
+              case 0:
+                context.go('/home/feed');
+                break;
+              case 1:
+                context.go('/home/post/new');
+                break;
+              case 2:
+                context.go('/home/profile');
+                break;
+            }
+          },
+        ),
       ),
     );
   }

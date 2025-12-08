@@ -6,6 +6,8 @@ import '../../theme/typography.dart';
 import '../../widgets/buttons/primary_button.dart';
 import '../../widgets/effects/gradient_background.dart';
 import '../../widgets/inputs/text_input.dart';
+import '../../../services/api/api_service.dart';
+import '../../../services/config/app_config_service.dart';
 
 /// Pantalla de registro para UPSGlam.
 /// Con validación completa y feedback visual en tiempo real.
@@ -24,14 +26,50 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _confirmPasswordController =
   TextEditingController();
 
+  @override
+  void initState() {
+    super.initState();
+    // Verificar conexión al cargar la pantalla
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      checkServerConnection();
+    });
+  }
+
+  /// Verifica la conexión con el servidor
+  Future<void> checkServerConnection() async {
+    setState(() {
+      _isCheckingConnection = true;
+    });
+
+    try {
+      final isConnected = await ApiService.checkConnection();
+      if (mounted) {
+        setState(() {
+          _isConnected = isConnected;
+          _isCheckingConnection = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isConnected = false;
+          _isCheckingConnection = false;
+        });
+      }
+    }
+  }
+
   // Variables de error
   String? _nameError;
   String? _emailError;
   String? _passwordError;
   String? _confirmPasswordError;
+  String? _generalError;
 
   // Estado del botón
   bool _isLoading = false;
+  bool _isCheckingConnection = false;
+  bool? _isConnected;
 
   /// Validación del nombre completo
   bool _isValidName(String value) {
@@ -61,7 +99,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             _confirmPasswordController.text.trim();
   }
 
-  void _handleRegister() {
+  Future<void> _handleRegister() async {
     if (_isLoading) {
       return;
     }
@@ -76,6 +114,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _emailError = null;
       _passwordError = null;
       _confirmPasswordError = null;
+      _generalError = null;
 
       if (!_isValidName(name)) {
         _nameError = 'Ingrese nombre y apellido válidos';
@@ -99,31 +138,93 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    // Simulación de proceso de registro
+    // Verificar conexión antes de intentar registro
+    if (_isConnected == false) {
+      setState(() {
+        _generalError = 'No se puede conectar al servidor. Verifica la IP configurada.';
+      });
+      return;
+    }
+
+    // Iniciar registro
     setState(() {
       _isLoading = true;
     });
 
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted) {
-        return;
-      }
+    try {
+      // Hacer petición al backend
+      final response = await ApiService.post(
+        '/api/auth/register',
+        {
+          'usr_username': name,
+          'usr_email': email,
+          'usr_password': password,
+          'usr_confirmPassword': confirmPassword,
+          'usr_bio': 'Hola, bienvenido a mi perfil',
+        },
+        requireAuth: false, // El registro no requiere autenticación
+      );
 
+      if (!mounted) return;
+
+      if (response.statusCode == 201) {
+        // Registro exitoso
+        debugPrint('Registro exitoso para: $email');
+
+        // Redirigir automáticamente al login cuando finaliza registro
+        if (mounted) {
+          context.go('/login');
+        }
+      } else if (response.statusCode == 409) {
+        // Email ya existe
+        setState(() {
+          _generalError = 'Este correo ya está registrado. Intenta iniciar sesión.';
+          _isLoading = false;
+        });
+      } else {
+        // Error del servidor
+        setState(() {
+          _generalError = 'Error del servidor. Intenta nuevamente.';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      debugPrint('Error en registro: $e');
       setState(() {
         _isLoading = false;
+
+        // Detectar tipo de error
+        if (e.toString().contains('Failed host lookup') ||
+            e.toString().contains('Connection refused') ||
+            e.toString().contains('SocketException')) {
+          _generalError = 'No se puede conectar al servidor. Verifica que esté corriendo y la IP sea correcta.';
+          _isConnected = false;
+        } else {
+          _generalError = 'Error de conexión. Verifica tu conexión a internet.';
+        }
       });
-
-      debugPrint('REGISTER OK → $name, $email');
-
-      // Redirigir automáticamente al login cuando finaliza registro
-      context.go('/login');
-    });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          // Si hay historial, hacer pop
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            // Si no hay historial, ir a login
+            context.go('/login');
+          }
+        }
+      },
+      child: Scaffold(
+        body: Container(
         decoration: const BoxDecoration(
           gradient: AppGradients.welcomeBackground,
         ),
@@ -146,6 +247,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       'Crear cuenta',
                       style: AppTypography.subtitle,
                     ),
+
+                    const SizedBox(height: 16),
+
+                    /// Indicador de estado de conexión
+                    _buildConnectionStatus(),
 
                     const SizedBox(height: 24),
 
@@ -214,13 +320,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       },
                     ),
 
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 16),
+
+                    /// Mensaje de error general
+                    if (_generalError != null)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error_outline, color: Colors.redAccent, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _generalError!,
+                                style: const TextStyle(
+                                  color: Colors.redAccent,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    if (_generalError != null) const SizedBox(height: 16),
 
                     /// Botón para registrar
                     PrimaryButton(
                       label: _isLoading ? 'Registrando...' : 'Registrarme',
                       isLoading: _isLoading,
-                      isDisabled: !_isFormValid || _isLoading,
+                      isDisabled: !_isFormValid || _isLoading || _isConnected == false,
                       onPressed: _handleRegister,
                     ),
 
@@ -251,6 +385,104 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
       ),
+      ),
     );
+  }
+
+  /// Widget para mostrar el estado de conexión al servidor
+  Widget _buildConnectionStatus() {
+    if (_isCheckingConnection) {
+      return Row(
+        children: [
+          SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Verificando conexión...',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.7),
+              fontSize: 12,
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (_isConnected == true) {
+      return Row(
+        children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: const BoxDecoration(
+              color: Colors.green,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          FutureBuilder<String>(
+            future: AppConfigService.getBaseUrl(),
+            builder: (context, snapshot) {
+              final serverUrl = snapshot.data ?? 'Servidor';
+              return Text(
+                'Conectado a $serverUrl',
+                style: TextStyle(
+                  color: Colors.green.shade300,
+                  fontSize: 12,
+                ),
+              );
+            },
+          ),
+        ],
+      );
+    }
+
+    if (_isConnected == false) {
+      return Row(
+        children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: const BoxDecoration(
+              color: Colors.red,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'No se puede conectar al servidor',
+              style: TextStyle(
+                color: Colors.red.shade300,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: checkServerConnection,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              'Reintentar',
+              style: TextStyle(
+                color: AppColors.upsYellow,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 }
