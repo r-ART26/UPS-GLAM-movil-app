@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../theme/typography.dart';
-// Import correcto del gradiente según tu estructura:
 import '../../widgets/effects/gradient_background.dart';
 
 /// Pantalla principal (Feed) con diseño institucional UPSGlam.
@@ -10,7 +9,6 @@ class FeedScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      // No usamos const porque AppGradients.welcomeBackground no es const
       decoration: const BoxDecoration(
         gradient: AppGradients.welcomeBackground,
       ),
@@ -18,29 +16,52 @@ class FeedScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            /// HEADER
+            /// HEADER SUPERIOR
             Padding(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text('Feed', style: AppTypography.subtitle),
-                  Icon(
-                    Icons.camera_alt_outlined,
-                    color: Colors.white,
-                    size: 28,
+                children: [
+                  // Marca UPSGlam
+                  Row(
+                    children: const [
+                      Text('UPS', style: AppTypography.titleUPS),
+                      SizedBox(width: 4),
+                      Text('Glam', style: AppTypography.titleGlam),
+                    ],
+                  ),
+
+                  // Icono de cámara (para futuro: crear post desde aquí)
+                  IconButton(
+                    onPressed: () {
+                      // TODO: Navegar a /home/post/new si quieres
+                      // context.go('/home/post/new');
+                    },
+                    icon: const Icon(
+                      Icons.camera_alt_outlined,
+                      color: Colors.white,
+                      size: 26,
+                    ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 8),
+            /// SUBTÍTULO
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                'Explora las fotos de la comunidad UPS',
+                style: AppTypography.body,
+              ),
+            ),
 
-            /// LISTA DE POSTS (mock, sin PostCard por ahora)
+            const SizedBox(height: 12),
+
+            /// LISTA DE POSTS
             Expanded(
               child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 itemCount: _mockPosts.length,
                 itemBuilder: (context, index) {
                   final post = _mockPosts[index];
@@ -49,7 +70,7 @@ class FeedScreen extends StatelessWidget {
                     margin: const EdgeInsets.only(bottom: 16),
                     decoration: BoxDecoration(
                       color: Colors.white.withAlpha(25),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(18),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -57,7 +78,7 @@ class FeedScreen extends StatelessWidget {
                         // Imagen del post
                         ClipRRect(
                           borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(16),
+                            top: Radius.circular(18),
                           ),
                           child: AspectRatio(
                             aspectRatio: 4 / 3,
@@ -68,27 +89,49 @@ class FeedScreen extends StatelessWidget {
                           ),
                         ),
 
-                        // Texto debajo
+                        // Contenido textual
                         Padding(
                           padding: const EdgeInsets.all(12),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                post['username'] as String,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                              // Usuario + fecha
+                              Row(
+                                mainAxisAlignment:
+                                MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    post['username'] as String,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                  Text(
+                                    post['time'] as String,
+                                    style: const TextStyle(
+                                      color: Colors.white60,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 4),
+
+                              const SizedBox(height: 6),
+
+                              // Descripción
                               Text(
                                 post['desc'] as String,
                                 style: const TextStyle(
                                   color: Colors.white70,
+                                  fontSize: 14,
                                 ),
                               ),
+
                               const SizedBox(height: 8),
+
+                              // Likes / acciones
                               Row(
                                 children: [
                                   const Icon(
@@ -128,12 +171,21 @@ final List<Map<String, dynamic>> _mockPosts = [
     'username': 'roberto.romero',
     'image': 'https://picsum.photos/id/10/800/600',
     'likes': 142,
+    'time': 'Hace 2 h',
     'desc': 'Tarde increíble en el campus UPS.',
   },
   {
     'username': 'daniela.garcia',
     'image': 'https://picsum.photos/id/27/800/600',
     'likes': 221,
+    'time': 'Hace 5 h',
     'desc': 'Nuevo proyecto de computación en marcha.',
+  },
+  {
+    'username': 'javier.malo',
+    'image': 'https://picsum.photos/id/33/800/600',
+    'likes': 89,
+    'time': 'Ayer',
+    'desc': 'Preparando la demo de UPSGlam 2.0.',
   },
 ];
