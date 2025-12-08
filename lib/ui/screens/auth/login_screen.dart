@@ -5,6 +5,9 @@ import '../../widgets/buttons/primary_button.dart';
 import '../../widgets/effects/gradient_background.dart';
 import '../../widgets/inputs/text_input.dart';
 import 'package:go_router/go_router.dart';
+import '../../../services/api/api_service.dart';
+import '../../../services/config/app_config_service.dart';
+import '../../../services/auth/auth_service.dart';
 
 
 /// Pantalla de inicio de sesión para la aplicación UPSGlam.
@@ -21,12 +24,48 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
+  @override
+  void initState() {
+    super.initState();
+    // Verificar conexión al cargar la pantalla
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      checkServerConnection();
+    });
+  }
+
+  /// Verifica la conexión con el servidor
+  Future<void> checkServerConnection() async {
+    setState(() {
+      _isCheckingConnection = true;
+    });
+
+    try {
+      final isConnected = await ApiService.checkConnection();
+      if (mounted) {
+        setState(() {
+          _isConnected = isConnected;
+          _isCheckingConnection = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isConnected = false;
+          _isCheckingConnection = false;
+        });
+      }
+    }
+  }
+
   // Variables para mostrar los errores en pantalla
   String? _emailError;
   String? _passwordError;
+  String? _generalError;
 
   // Estado de carga del botón
   bool _isLoading = false;
+  bool _isCheckingConnection = false;
+  bool? _isConnected;
 
   /// Validación de correo institucional UPS
   bool _isValidEmail(String value) {
@@ -46,7 +85,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return _isValidEmail(email) && _isValidPassword(password);
   }
 
-  void _handleLogin() {
+  Future<void> _handleLogin() async {
     if (_isLoading) return;
 
     final email = _emailController.text.trim();
@@ -56,6 +95,7 @@ class _LoginScreenState extends State<LoginScreen> {
       // Reset errores
       _emailError = null;
       _passwordError = null;
+      _generalError = null;
 
       // Validación de correo
       if (!_isValidEmail(email)) {
@@ -71,26 +111,102 @@ class _LoginScreenState extends State<LoginScreen> {
     // Si hay errores → no continuar
     if (_emailError != null || _passwordError != null) return;
 
-    // Simular login en progreso (por ahora solo delay)
+    // Verificar conexión antes de intentar login
+    if (_isConnected == false) {
+      setState(() {
+        _generalError = 'No se puede conectar al servidor. Verifica la IP configurada.';
+      });
+      return;
+    }
+
+    // Iniciar login
     setState(() {
       _isLoading = true;
     });
 
-    Future.delayed(const Duration(seconds: 2), () {
+    try {
+      // Hacer petición al backend
+      final response = await ApiService.post(
+        '/api/auth/login',
+        {
+          'email': email,
+          'password': password,
+        },
+      );
+
       if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        // Login exitoso
+        final token = response.body; // El servidor retorna el token como String
+        debugPrint('Login exitoso. Token: ${token.substring(0, token.length > 20 ? 20 : token.length)}...');
+        
+        // Guardar el token para futuras peticiones autenticadas
+        final saved = await AuthService.saveToken(token);
+        if (!saved) {
+          if (mounted) {
+            setState(() {
+              _generalError = 'Error al guardar la sesión. Intenta nuevamente.';
+              _isLoading = false;
+            });
+          }
+          return;
+        }
+        
+        // Navegar al feed
+        if (mounted) {
+          context.go('/home/feed');
+        }
+      } else if (response.statusCode == 401) {
+        // Credenciales inválidas
+        setState(() {
+          _generalError = 'Error al iniciar sesión';
+          _isLoading = false;
+        });
+      } else {
+        // Error del servidor
+        setState(() {
+          _generalError = 'Error al iniciar sesión';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      
+      debugPrint('Error en login: $e');
       setState(() {
         _isLoading = false;
+        
+        // Detectar tipo de error
+        if (e.toString().contains('Failed host lookup') || 
+            e.toString().contains('Connection refused') ||
+            e.toString().contains('SocketException')) {
+          _generalError = 'No se puede conectar al servidor. Verifica que esté corriendo y la IP sea correcta.';
+          _isConnected = false;
+        } else {
+          _generalError = 'Error de conexión. Verifica tu conexión a internet.';
+        }
       });
-
-      debugPrint('LOGIN OK → correo: $email');
-      // Aquí más adelante se navegará al feed tras login correcto
-    });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          // Si hay historial, hacer pop
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            // Si no hay historial, ir a welcome
+            context.go('/welcome');
+          }
+        }
+      },
+      child: Scaffold(
+        body: Container(
         decoration: const BoxDecoration(
           gradient: AppGradients.welcomeBackground,
         ),
@@ -116,6 +232,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       'Iniciar sesión',
                       style: AppTypography.subtitle,
                     ),
+
+                    const SizedBox(height: 16),
+
+                    /// Indicador de estado de conexión
+                    _buildConnectionStatus(),
 
                     const SizedBox(height: 24),
 
@@ -160,13 +281,42 @@ class _LoginScreenState extends State<LoginScreen> {
                       },
                     ),
 
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 16),
+
+                    /// Mensaje de error general
+                    if (_generalError != null)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error_outline, color: Colors.redAccent, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _generalError!,
+                                style: const TextStyle(
+                                  color: Colors.redAccent,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    if (_generalError != null) const SizedBox(height: 16),
 
                     /// Botón para iniciar sesión
                     PrimaryButton(
                       label: _isLoading ? 'Ingresando...' : 'Ingresar',
                       isLoading: _isLoading,
-                      isDisabled: !_isFormValid || _isLoading,
+                      isDisabled: !_isFormValid || _isLoading || _isConnected == false,
                       onPressed: _handleLogin,
                     ),
 
@@ -197,6 +347,104 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
+      ),
     );
+  }
+
+  /// Widget para mostrar el estado de conexión al servidor
+  Widget _buildConnectionStatus() {
+    if (_isCheckingConnection) {
+      return Row(
+        children: [
+          SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Verificando conexión...',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.7),
+              fontSize: 12,
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (_isConnected == true) {
+      return Row(
+        children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: const BoxDecoration(
+              color: Colors.green,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          FutureBuilder<String>(
+            future: AppConfigService.getBaseUrl(),
+            builder: (context, snapshot) {
+              final serverUrl = snapshot.data ?? 'Servidor';
+              return Text(
+                'Conectado a $serverUrl',
+                style: TextStyle(
+                  color: Colors.green.shade300,
+                  fontSize: 12,
+                ),
+              );
+            },
+          ),
+        ],
+      );
+    }
+
+    if (_isConnected == false) {
+      return Row(
+        children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: const BoxDecoration(
+              color: Colors.red,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'No se puede conectar al servidor',
+              style: TextStyle(
+                color: Colors.red.shade300,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: checkServerConnection,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              'Reintentar',
+              style: TextStyle(
+                color: AppColors.upsYellow,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 }

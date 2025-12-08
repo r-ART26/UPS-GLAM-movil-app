@@ -54,3 +54,7 @@ firebase.json
 .env
 .env.*
 !.env.example
+
+linux/flutter/
+macos/flutter/
+windows/flutter/

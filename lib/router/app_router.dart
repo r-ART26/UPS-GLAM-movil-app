@@ -13,9 +13,17 @@ import '../ui/screens/feed/feed_screen.dart';
 import '../ui/screens/post/new_post_screen.dart';
 import '../ui/screens/profile/profile_screen.dart';
 
+// Middleware
+import '../services/auth/auth_middleware.dart';
+
 /// Router central de la aplicación.
 final GoRouter appRouter = GoRouter(
-  initialLocation: '/home/feed',
+  initialLocation: '/welcome',
+  
+  // Redirección basada en autenticación
+  redirect: (context, state) async {
+    return await AuthMiddleware.redirect(state.uri.path);
+  },
 
   routes: [
     // ========================
