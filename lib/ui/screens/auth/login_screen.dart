@@ -4,6 +4,7 @@ import '../../theme/typography.dart';
 import '../../widgets/buttons/primary_button.dart';
 import '../../widgets/effects/gradient_background.dart';
 import '../../widgets/inputs/text_input.dart';
+import 'register_screen.dart';
 
 /// Pantalla de inicio de sesión para la aplicación UPSGlam.
 /// Mantiene coherencia con la línea gráfica institucional.
@@ -76,8 +77,12 @@ class LoginScreen extends StatelessWidget {
                     Center(
                       child: GestureDetector(
                         onTap: () {
-                          // TODO: Navegar a register_screen.dart
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                          );
                         },
+
                         child: const Text(
                           '¿No tienes cuenta? Regístrate aquí',
                           style: TextStyle(

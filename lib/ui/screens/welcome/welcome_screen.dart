@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../widgets/buttons/primary_button.dart';
 import '../../widgets/effects/gradient_background.dart';
