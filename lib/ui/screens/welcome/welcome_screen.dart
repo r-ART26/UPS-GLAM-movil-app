@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
 import '../../theme/typography.dart';
 import '../../widgets/buttons/primary_button.dart';
 import '../../widgets/effects/gradient_background.dart';
-import '../auth/login_screen.dart';
 
 /// Pantalla de bienvenida institucional UPS.
 class WelcomeScreen extends StatelessWidget {
@@ -43,10 +44,7 @@ class WelcomeScreen extends StatelessWidget {
                 PrimaryButton(
                   label: 'Continuar',
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const LoginScreen()),
-                    );
+                    context.go('/login');
                   },
                 ),
               ],

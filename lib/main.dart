@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
-// Pantalla inicial
-import 'ui/screens/welcome/welcome_screen.dart';
+// GoRouter
+import 'router/app_router.dart';
 
-// Tema global UPSGlam
+// Tema global
 import 'ui/theme/app_theme.dart';
 
 Future<void> main() async {
@@ -18,20 +18,18 @@ Future<void> main() async {
   runApp(const MyApp());
 }
 
-/// Aplicación principal de UPSGlam 2.0
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'UPSGlam 2.0',
       debugShowCheckedModeBanner: false,
 
-      // Ahora sí usamos el ThemeData global que creamos en Fase 1.3
       theme: AppTheme.light,
 
-      home: const WelcomeScreen(),
+      routerConfig: appRouter,
     );
   }
 }

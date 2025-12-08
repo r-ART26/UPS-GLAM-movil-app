@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../widgets/buttons/primary_button.dart';
@@ -19,7 +21,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+  TextEditingController();
 
   // Variables de error
   String? _nameError;
@@ -38,7 +41,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   /// Validación de correo institucional
   bool _isValidEmail(String value) {
-    if (!value.contains('@')) return false;
+    if (!value.contains('@')) {
+      return false;
+    }
     return value.endsWith('@ups.edu.ec') || value.endsWith('@est.ups.edu.ec');
   }
 
@@ -52,11 +57,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return _isValidName(_nameController.text.trim()) &&
         _isValidEmail(_emailController.text.trim()) &&
         _isValidPassword(_passwordController.text.trim()) &&
-        _passwordController.text.trim() == _confirmPasswordController.text.trim();
+        _passwordController.text.trim() ==
+            _confirmPasswordController.text.trim();
   }
 
   void _handleRegister() {
-    if (_isLoading) return;
+    if (_isLoading) {
+      return;
+    }
 
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
@@ -83,6 +91,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
     });
 
+    // Si existe al menos un error, no continuar
     if (_nameError != null ||
         _emailError != null ||
         _passwordError != null ||
@@ -91,14 +100,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     // Simulación de proceso de registro
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+    });
 
     Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
 
       debugPrint('REGISTER OK → $name, $email');
-      // Aquí más adelante se llamará a Firebase Auth
+
+      // Redirigir automáticamente al login cuando finaliza registro
+      context.go('/login');
     });
   }
 
@@ -112,7 +130,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         child: SafeArea(
           child: SizedBox.expand(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
+              padding:
+              const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
                   minHeight: MediaQuery.of(context).size.height -
@@ -123,7 +142,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    /// Título
                     const Text(
                       'Crear cuenta',
                       style: AppTypography.subtitle,
@@ -139,11 +157,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       prefixIcon: Icons.person_outline,
                       errorText: _nameError,
                       onChanged: (_) {
-                        if (_nameError != null) {
-                          setState(() => _nameError = null);
-                        } else {
-                          setState(() {});
-                        }
+                        setState(() {
+                          _nameError = null;
+                        });
                       },
                     ),
 
@@ -158,11 +174,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       prefixIcon: Icons.email_outlined,
                       errorText: _emailError,
                       onChanged: (_) {
-                        if (_emailError != null) {
-                          setState(() => _emailError = null);
-                        } else {
-                          setState(() {});
-                        }
+                        setState(() {
+                          _emailError = null;
+                        });
                       },
                     ),
 
@@ -177,11 +191,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       prefixIcon: Icons.lock_outline,
                       errorText: _passwordError,
                       onChanged: (_) {
-                        if (_passwordError != null) {
-                          setState(() => _passwordError = null);
-                        } else {
-                          setState(() {});
-                        }
+                        setState(() {
+                          _passwordError = null;
+                        });
                       },
                     ),
 
@@ -196,11 +208,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       prefixIcon: Icons.lock_outline,
                       errorText: _confirmPasswordError,
                       onChanged: (_) {
-                        if (_confirmPasswordError != null) {
-                          setState(() => _confirmPasswordError = null);
-                        } else {
-                          setState(() {});
-                        }
+                        setState(() {
+                          _confirmPasswordError = null;
+                        });
                       },
                     ),
 
@@ -219,7 +229,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     /// Enlace a login
                     Center(
                       child: GestureDetector(
-                        onTap: () => Navigator.pop(context),
+                        onTap: () {
+                          context.go('/login');
+                        },
                         child: const Text(
                           '¿Ya tienes cuenta? Inicia sesión',
                           style: TextStyle(

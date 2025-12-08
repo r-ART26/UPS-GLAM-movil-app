@@ -4,7 +4,8 @@ import '../../theme/typography.dart';
 import '../../widgets/buttons/primary_button.dart';
 import '../../widgets/effects/gradient_background.dart';
 import '../../widgets/inputs/text_input.dart';
-import 'register_screen.dart';
+import 'package:go_router/go_router.dart';
+
 
 /// Pantalla de inicio de sesión para la aplicación UPSGlam.
 /// Con validación real usando el nuevo TextInput y PrimaryButton.
@@ -175,12 +176,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     Center(
                       child: GestureDetector(
                         onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const RegisterScreen(),
-                            ),
-                          );
+                          context.push('/register');
                         },
                         child: const Text(
                           '¿No tienes cuenta? Regístrate aquí',
