@@ -7,7 +7,7 @@ import '../../widgets/inputs/text_input.dart';
 import 'register_screen.dart';
 
 /// Pantalla de inicio de sesión para la aplicación UPSGlam.
-/// Con validación real usando el nuevo TextInput mejorado.
+/// Con validación real usando el nuevo TextInput y PrimaryButton.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -24,6 +24,9 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _emailError;
   String? _passwordError;
 
+  // Estado de carga del botón
+  bool _isLoading = false;
+
   /// Validación de correo institucional UPS
   bool _isValidEmail(String value) {
     if (!value.contains('@')) return false;
@@ -35,7 +38,16 @@ class _LoginScreenState extends State<LoginScreen> {
     return value.length >= 6;
   }
 
+  /// Form válido según las reglas actuales
+  bool get _isFormValid {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    return _isValidEmail(email) && _isValidPassword(password);
+  }
+
   void _handleLogin() {
+    if (_isLoading) return;
+
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
@@ -58,9 +70,20 @@ class _LoginScreenState extends State<LoginScreen> {
     // Si hay errores → no continuar
     if (_emailError != null || _passwordError != null) return;
 
-    // Aquí se implementará Firebase Auth en Fase 2
-    // Por ahora solo print
-    debugPrint('LOGIN OK → correo: $email');
+    // Simular login en progreso (por ahora solo delay)
+    setState(() {
+      _isLoading = true;
+    });
+
+    Future.delayed(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+
+      debugPrint('LOGIN OK → correo: $email');
+      // Aquí más adelante se navegará al feed tras login correcto
+    });
   }
 
   @override
@@ -103,6 +126,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       keyboardType: TextInputType.emailAddress,
                       controller: _emailController,
                       errorText: _emailError,
+                      onChanged: (_) {
+                        // Limpiar error mientras el usuario corrige
+                        if (_emailError != null) {
+                          setState(() {
+                            _emailError = null;
+                          });
+                        } else {
+                          setState(() {});
+                        }
+                      },
                     ),
 
                     const SizedBox(height: 16),
@@ -115,13 +148,24 @@ class _LoginScreenState extends State<LoginScreen> {
                       obscureText: true,
                       controller: _passwordController,
                       errorText: _passwordError,
+                      onChanged: (_) {
+                        if (_passwordError != null) {
+                          setState(() {
+                            _passwordError = null;
+                          });
+                        } else {
+                          setState(() {});
+                        }
+                      },
                     ),
 
                     const SizedBox(height: 32),
 
                     /// Botón para iniciar sesión
                     PrimaryButton(
-                      label: 'Ingresar',
+                      label: _isLoading ? 'Ingresando...' : 'Ingresar',
+                      isLoading: _isLoading,
+                      isDisabled: !_isFormValid || _isLoading,
                       onPressed: _handleLogin,
                     ),
 

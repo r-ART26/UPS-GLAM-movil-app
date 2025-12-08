@@ -8,6 +8,7 @@ import '../../theme/colors.dart';
 /// - Icono opcional a la izquierda (prefixIcon).
 /// - Botón para mostrar/ocultar contraseña.
 /// - Soporte para mostrar mensaje de error.
+/// - Callback onChanged para reaccionar desde la pantalla.
 /// - Mantiene el estilo visual UPS ya definido.
 ///
 /// NOTA:
@@ -20,6 +21,7 @@ class TextInput extends StatefulWidget {
   final TextEditingController? controller;
   final IconData? prefixIcon;
   final String? errorText;
+  final ValueChanged<String>? onChanged;
 
   const TextInput({
     super.key,
@@ -30,6 +32,7 @@ class TextInput extends StatefulWidget {
     this.controller,
     this.prefixIcon,
     this.errorText,
+    this.onChanged,
   });
 
   @override
@@ -106,6 +109,7 @@ class _TextInputState extends State<TextInput> {
               color: AppColors.textWhite,
               fontSize: 16,
             ),
+            onChanged: widget.onChanged,
             decoration: InputDecoration(
               contentPadding:
               const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -145,7 +149,6 @@ class _TextInputState extends State<TextInput> {
           ),
         ),
 
-        /// Espaciado si hay error
         if (hasError) const SizedBox(height: 4),
       ],
     );
