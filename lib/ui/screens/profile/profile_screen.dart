@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme/typography.dart';
+import '../../theme/colors.dart';
 import '../../widgets/effects/gradient_background.dart';
 import '../../../services/auth/auth_service.dart';
 
@@ -13,7 +14,7 @@ class ProfileScreen extends StatelessWidget {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          backgroundColor: Colors.white,
+          backgroundColor: AppColors.upsBlueDark,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -22,17 +23,18 @@ class ProfileScreen extends StatelessWidget {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.logout, color: Colors.red),
+                leading: const Icon(Icons.logout, color: Colors.redAccent),
                 title: const Text(
                   'Cerrar sesión',
                   style: TextStyle(
-                    color: Colors.red,
+                    color: Colors.redAccent,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -48,7 +50,10 @@ class ProfileScreen extends StatelessWidget {
               onPressed: () {
                 Navigator.of(dialogContext).pop();
               },
-              child: const Text('Cancelar'),
+              child: const Text(
+                'Cancelar',
+                style: TextStyle(color: Colors.white70),
+              ),
             ),
           ],
         );
@@ -63,25 +68,34 @@ class ProfileScreen extends StatelessWidget {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          backgroundColor: Colors.white,
+          backgroundColor: AppColors.upsBlueDark,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: const Text('Cerrar sesión'),
-          content: const Text('¿Estás seguro de que deseas cerrar sesión?'),
+          title: const Text(
+            'Cerrar sesión',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: const Text(
+            '¿Estás seguro de que deseas cerrar sesión?',
+            style: TextStyle(color: Colors.white70),
+          ),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.of(dialogContext).pop(false);
               },
-              child: const Text('Cancelar'),
+              child: const Text(
+                'Cancelar',
+                style: TextStyle(color: Colors.white70),
+              ),
             ),
             TextButton(
               onPressed: () {
                 Navigator.of(dialogContext).pop(true);
               },
               style: TextButton.styleFrom(
-                foregroundColor: Colors.red,
+                foregroundColor: Colors.redAccent,
               ),
               child: const Text('Cerrar sesión'),
             ),
