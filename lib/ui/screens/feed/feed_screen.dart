@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../theme/typography.dart';
 import '../../widgets/effects/gradient_background.dart';
 import '../../../services/posts/feed_service.dart';
+import '../post/post_detail_screen.dart';
 
 /// Pantalla principal (Feed) con integración a Firestore en Tiempo Real.
 class FeedScreen extends StatelessWidget {
@@ -100,8 +101,9 @@ class FeedScreen extends StatelessWidget {
                     ),
                     itemCount: docs.length,
                     itemBuilder: (context, index) {
-                      final data = docs[index].data() as Map<String, dynamic>;
-                      return _buildPostCard(data);
+                      final doc = docs[index];
+                      final data = doc.data() as Map<String, dynamic>;
+                      return _buildPostCard(context, data, doc.id);
                     },
                   );
                 },
@@ -113,7 +115,11 @@ class FeedScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPostCard(Map<String, dynamic> post) {
+  Widget _buildPostCard(
+    BuildContext context,
+    Map<String, dynamic> post,
+    String docId,
+  ) {
     // Extracción segura de datos (campos pos_*)
     final imageUrl =
         post['pos_imageUrl'] as String? ??
@@ -141,33 +147,53 @@ class FeedScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Imagen del post
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-            child: AspectRatio(
-              aspectRatio: 4 / 3,
-              child: Image.network(
-                imageUrl,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return ColoredBox(
-                    color: Colors.black12,
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        value: loadingProgress.expectedTotalBytes != null
-                            ? loadingProgress.cumulativeBytesLoaded /
-                                  loadingProgress.expectedTotalBytes!
-                            : null,
-                        color: Colors.white24,
+          // Imagen del post - Tapa para ver detalles
+          GestureDetector(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => PostDetailScreen(
+                    postId: docId,
+                    imageUrl: imageUrl,
+                    description: caption,
+                    authorName:
+                        'Usuario', // Se resolverá dentro si es necesario, o podemos pasar el UID
+                  ),
+                ),
+              );
+            },
+            child: Hero(
+              tag: docId,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(18),
+                ),
+                child: AspectRatio(
+                  aspectRatio: 4 / 3,
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return ColoredBox(
+                        color: Colors.black12,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                      loadingProgress.expectedTotalBytes!
+                                : null,
+                            color: Colors.white24,
+                          ),
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      color: Colors.grey[800],
+                      child: const Center(
+                        child: Icon(Icons.broken_image, color: Colors.white54),
                       ),
                     ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) => Container(
-                  color: Colors.grey[800],
-                  child: const Center(
-                    child: Icon(Icons.broken_image, color: Colors.white54),
                   ),
                 ),
               ),
