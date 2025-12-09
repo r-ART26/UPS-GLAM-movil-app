@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../theme/typography.dart';
 import '../../widgets/effects/gradient_background.dart';
+import '../../../services/posts/feed_service.dart';
 
-/// Pantalla principal (Feed) con diseño institucional UPStagram.
+/// Pantalla principal (Feed) con integración a Firestore en Tiempo Real.
 class FeedScreen extends StatelessWidget {
   const FeedScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: AppGradients.welcomeBackground,
-      ),
+      decoration: const BoxDecoration(gradient: AppGradients.welcomeBackground),
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -31,14 +31,14 @@ class FeedScreen extends StatelessWidget {
                     ],
                   ),
 
-                  // Icono de cámara (para futuro: crear post desde aquí)
+                  // Botón de recargar manual (útil si hay error de red)
+                  // Opcional, ya que es realtime
                   IconButton(
                     onPressed: () {
-                      // TODO: Navegar a /home/post/new si quieres
-                      // context.go('/home/post/new');
+                      // Acción futura: Scroll to top
                     },
                     icon: const Icon(
-                      Icons.camera_alt_outlined,
+                      Icons.camera_alt_outlined, // Placeholder para cámara
                       color: Colors.white,
                       size: 26,
                     ),
@@ -58,102 +58,51 @@ class FeedScreen extends StatelessWidget {
 
             const SizedBox(height: 12),
 
-            /// LISTA DE POSTS
+            /// LISTA DE POSTS (STREAM REALTIME)
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                itemCount: _mockPosts.length,
-                itemBuilder: (context, index) {
-                  final post = _mockPosts[index];
+              child: StreamBuilder<QuerySnapshot>(
+                stream: FeedService.getPostsStream(),
+                builder: (context, snapshot) {
+                  // 1. Cargando
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(color: Colors.white),
+                    );
+                  }
 
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withAlpha(25),
-                      borderRadius: BorderRadius.circular(18),
+                  // 2. Error
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text(
+                        'Error al cargar posts: ${snapshot.error}',
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                    );
+                  }
+
+                  // 3. Datos vacíos
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'No hay publicaciones aún.\n¡Sé el primero en postear!',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                    );
+                  }
+
+                  final docs = snapshot.data!.docs;
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Imagen del post
-                        ClipRRect(
-                          borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(18),
-                          ),
-                          child: AspectRatio(
-                            aspectRatio: 4 / 3,
-                            child: Image.network(
-                              post['image'] as String,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-
-                        // Contenido textual
-                        Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Usuario + fecha
-                              Row(
-                                mainAxisAlignment:
-                                MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    post['username'] as String,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 15,
-                                    ),
-                                  ),
-                                  Text(
-                                    post['time'] as String,
-                                    style: const TextStyle(
-                                      color: Colors.white60,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-
-                              const SizedBox(height: 6),
-
-                              // Descripción
-                              Text(
-                                post['desc'] as String,
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 14,
-                                ),
-                              ),
-
-                              const SizedBox(height: 8),
-
-                              // Likes / acciones
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.favorite_border,
-                                    color: Colors.white70,
-                                    size: 18,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${post['likes']} me gusta',
-                                    style: const TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                    itemCount: docs.length,
+                    itemBuilder: (context, index) {
+                      final data = docs[index].data() as Map<String, dynamic>;
+                      return _buildPostCard(data);
+                    },
                   );
                 },
               ),
@@ -163,29 +112,147 @@ class FeedScreen extends StatelessWidget {
       ),
     );
   }
-}
 
-/// Datos temporales para pruebas (mock)
-final List<Map<String, dynamic>> _mockPosts = [
-  {
-    'username': 'roberto.romero',
-    'image': 'https://picsum.photos/id/10/800/600',
-    'likes': 142,
-    'time': 'Hace 2 h',
-    'desc': 'Tarde increíble en el campus UPS.',
-  },
-  {
-    'username': 'daniela.garcia',
-    'image': 'https://picsum.photos/id/27/800/600',
-    'likes': 221,
-    'time': 'Hace 5 h',
-    'desc': 'Nuevo proyecto de computación en marcha.',
-  },
-  {
-    'username': 'javier.malo',
-    'image': 'https://picsum.photos/id/33/800/600',
-    'likes': 89,
-    'time': 'Ayer',
-    'desc': 'Preparando la demo de UPStagram 2.0.',
-  },
-];
+  Widget _buildPostCard(Map<String, dynamic> post) {
+    // Extracción segura de datos (campos pos_*)
+    final imageUrl =
+        post['pos_imageUrl'] as String? ??
+        'https://via.placeholder.com/800x600?text=No+Image';
+    // Nota: La DB parece no tener username plano, usa authorUid.
+    // Por ahora pondremos un placeholder o el ID hasta resolver cómo traer el nombre.
+    final username = post['pos_authorUid'] as String? ?? 'Usuario UPS';
+    final caption = post['pos_caption'] as String? ?? '';
+    final likes = post['pos_likesCount'] as int? ?? 0;
+
+    // Manejo de Timestamp
+    String timeAgo = 'Reciente';
+    if (post['pos_timestamp'] != null) {
+      final timestamp = post['pos_timestamp'] as Timestamp;
+      timeAgo = _getTimeAgo(timestamp.toDate());
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white.withAlpha(25),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Imagen del post
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+            child: AspectRatio(
+              aspectRatio: 4 / 3,
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return ColoredBox(
+                    color: Colors.black12,
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                            : null,
+                        color: Colors.white24,
+                      ),
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) => Container(
+                  color: Colors.grey[800],
+                  child: const Center(
+                    child: Icon(Icons.broken_image, color: Colors.white54),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Contenido textual
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Usuario + fecha
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      username,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                    Text(
+                      timeAgo,
+                      style: const TextStyle(
+                        color: Colors.white60,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 6),
+
+                // Descripción
+                if (caption.isNotEmpty)
+                  Text(
+                    caption,
+                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
+
+                const SizedBox(height: 8),
+
+                // Likes / acciones
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.favorite_border,
+                      color: Colors.white70,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '$likes me gusta',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Utilidad simple para calcular tiempo relativo
+  String _getTimeAgo(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays > 7) {
+      return '${date.day}/${date.month}/${date.year}';
+    } else if (difference.inDays >= 1) {
+      return 'Hace ${difference.inDays} d';
+    } else if (difference.inHours >= 1) {
+      return 'Hace ${difference.inHours} h';
+    } else if (difference.inMinutes >= 1) {
+      return 'Hace ${difference.inMinutes} min';
+    } else {
+      return 'Hace un momento';
+    }
+  }
+}
