@@ -9,7 +9,7 @@ import '../../widgets/inputs/text_input.dart';
 import '../../../services/api/api_service.dart';
 import '../../../services/config/app_config_service.dart';
 
-/// Pantalla de registro para UPSGlam.
+/// Pantalla de registro para UPStagram.
 /// Con validación completa y feedback visual en tiempo real.
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});

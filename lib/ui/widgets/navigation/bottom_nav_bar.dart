@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/colors.dart';
 
-/// Bottom Navigation Bar institucional para UPSGlam.
+/// Bottom Navigation Bar institucional para UPStagram.
 /// Íconos amarillos cuando están activos, íconos blancos cuando están inactivos.
 class BottomNavBar extends StatelessWidget {
   final int currentIndex;
