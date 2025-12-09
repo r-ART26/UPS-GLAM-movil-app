@@ -119,10 +119,11 @@ class FeedScreen extends StatelessWidget {
         post['pos_imageUrl'] as String? ??
         'https://via.placeholder.com/800x600?text=No+Image';
     // Nota: La DB parece no tener username plano, usa authorUid.
-    // Por ahora pondremos un placeholder o el ID hasta resolver cómo traer el nombre.
-    final username = post['pos_authorUid'] as String? ?? 'Usuario UPS';
+    // Usamos el UID para buscar el nombre en el widget
+    final authorUid = post['pos_authorUid'] as String? ?? '';
     final caption = post['pos_caption'] as String? ?? '';
     final likes = post['pos_likesCount'] as int? ?? 0;
+    final comments = post['pos_commentsCount'] as int? ?? 0;
 
     // Manejo de Timestamp
     String timeAgo = 'Reciente';
@@ -183,14 +184,9 @@ class FeedScreen extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      username,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                      ),
-                    ),
+                    // Nombre dinámico desde Firebase 'Users'
+                    _UserNameFetcher(uid: authorUid),
+
                     Text(
                       timeAgo,
                       style: const TextStyle(
@@ -212,21 +208,48 @@ class FeedScreen extends StatelessWidget {
 
                 const SizedBox(height: 8),
 
-                // Likes / acciones
+                // Barra de Acciones: Likes y Comentarios
                 Row(
                   children: [
-                    const Icon(
-                      Icons.favorite_border,
-                      color: Colors.white70,
-                      size: 18,
+                    // --- LIKES ---
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.favorite_border,
+                          color: Colors.white70,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '$likes',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '$likes me gusta',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                      ),
+
+                    const SizedBox(width: 24), // Espacio entre grupos
+                    // --- COMENTARIOS ---
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.chat_bubble_outline,
+                          color: Colors.white70,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '$comments',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -254,5 +277,62 @@ class FeedScreen extends StatelessWidget {
     } else {
       return 'Hace un momento';
     }
+  }
+}
+
+/// Widget pequeño para cargar el nombre de usuario bajo demanda
+class _UserNameFetcher extends StatelessWidget {
+  final String uid;
+
+  const _UserNameFetcher({required this.uid});
+
+  @override
+  Widget build(BuildContext context) {
+    // Si no hay UID válido
+    if (uid.isEmpty) {
+      return const Text(
+        'Usuario UPS',
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+          fontSize: 15,
+        ),
+      );
+    }
+
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance.collection('Users').doc(uid).get(),
+      builder: (context, snapshot) {
+        // 1. Cargando o esperando
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            width: 80,
+            height: 14,
+            decoration: BoxDecoration(
+              color: Colors.white10,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          );
+        }
+
+        // 2. Extraer nombre
+        String name = 'Usuario UPS';
+        if (snapshot.hasData &&
+            snapshot.data != null &&
+            snapshot.data!.exists) {
+          final data = snapshot.data!.data() as Map<String, dynamic>?;
+          name = data?['usr_username'] as String? ?? 'Usuario UPS';
+        }
+
+        return Text(
+          name,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
+          ),
+        );
+      },
+    );
   }
 }
