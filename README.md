@@ -1,4 +1,4 @@
-# UPStagram 2.0 📸
+# UPStagram
 
 Aplicación móvil desarrollada en Flutter para compartir fotografías con la comunidad UPS. La aplicación permite aplicar filtros avanzados a las imágenes, publicar posts y gestionar un perfil de usuario.
 
