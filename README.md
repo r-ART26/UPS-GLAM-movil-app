@@ -59,7 +59,7 @@ Aplicación móvil desarrollada en Flutter para compartir fotografías con la co
 
 ### Configuración del Servidor Backend
 
-Al iniciar la aplicación por primera vez, se te pedirá ingresar la dirección IP de tu servidor Spring Boot. Esta IP debe ser la dirección de tu red local donde está ejecutándose el backend.
+Al iniciar la aplicación por primera vez, se te pedirá ingresar la dirección IP de tu servidor Spring Boot. Esta IP debe ser la dirección de tu red local donde está ejecutándose el backend. El repositorio del backend es [UPSGlam-2-backend-springboot](https://github.com/Jonnathan23/UPSGlam-2-backend-springboot). Este backend usa un microservicio de Fastapi -> [VisionProcessingGPU-Kit](https://github.com/Juanja1306/VisionProcessingGPU-Kit)
 
 **Ejemplo:**
 - Si tu servidor Spring Boot está en `http://192.168.1.100:8080`, ingresa: `192.168.1.100`
