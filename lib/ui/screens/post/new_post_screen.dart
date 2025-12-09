@@ -26,6 +26,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
   final TextEditingController _captionController = TextEditingController();
 
   File? _originalImage;
+  Uint8List? _originalImageBytes; // Bytes de la imagen original para mostrar
   Uint8List? _processedImage;
   String? _currentFilter;
   Map<String, dynamic> _filterParams = {};
@@ -98,11 +99,15 @@ class _NewPostScreenState extends State<NewPostScreen> {
       if (pickedFile != null) {
         final file = File(pickedFile.path);
         
+        // Leer bytes de la imagen para mostrar inmediatamente
+        final imageBytes = await file.readAsBytes();
+        
         // Guardar imagen original temporalmente
         final tempFile = await TempImageService.saveOriginalImage(file);
         if (tempFile != null) {
           setState(() {
             _originalImage = tempFile;
+            _originalImageBytes = imageBytes; // Actualizar bytes para mostrar
             _processedImage = null;
             _currentFilter = null;
             _showParamsPanel = false;
@@ -150,7 +155,11 @@ class _NewPostScreenState extends State<NewPostScreen> {
       switch (filterName.toLowerCase()) {
         case 'original':
           // Mostrar imagen original sin procesar
-          result = await _originalImage!.readAsBytes();
+          if (_originalImageBytes != null) {
+            result = _originalImageBytes;
+          } else {
+            result = await _originalImage!.readAsBytes();
+          }
           break;
         case 'canny':
           result = await ImageProcessingService.applyCanny(
@@ -607,8 +616,8 @@ class _NewPostScreenState extends State<NewPostScreen> {
       );
     }
 
-    if (_originalImage != null) {
-      // Mostrar imagen original
+    if (_originalImage != null && _originalImageBytes != null) {
+      // Mostrar imagen original usando bytes para evitar problemas de caché
       return GestureDetector(
         onTap: _selectImage,
         child: Container(
@@ -619,8 +628,8 @@ class _NewPostScreenState extends State<NewPostScreen> {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(14),
-            child: Image.file(
-              _originalImage!,
+            child: Image.memory(
+              _originalImageBytes!,
               fit: BoxFit.cover,
               width: double.infinity,
             ),
