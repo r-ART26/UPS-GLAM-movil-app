@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../theme/typography.dart';
 import '../../widgets/effects/gradient_background.dart';
 
-/// Pantalla principal (Feed) con diseño institucional UPSGlam.
+/// Pantalla principal (Feed) con diseño institucional UPStagram.
 class FeedScreen extends StatelessWidget {
   const FeedScreen({super.key});
 
@@ -22,12 +22,12 @@ class FeedScreen extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Marca UPSGlam
+                  // Marca UPStagram
                   Row(
                     children: const [
                       Text('UPS', style: AppTypography.titleUPS),
                       SizedBox(width: 4),
-                      Text('Glam', style: AppTypography.titleGlam),
+                      Text('tagram', style: AppTypography.titleGlam),
                     ],
                   ),
 
@@ -186,6 +186,6 @@ final List<Map<String, dynamic>> _mockPosts = [
     'image': 'https://picsum.photos/id/33/800/600',
     'likes': 89,
     'time': 'Ayer',
-    'desc': 'Preparando la demo de UPSGlam 2.0.',
+    'desc': 'Preparando la demo de UPStagram 2.0.',
   },
 ];

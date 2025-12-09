@@ -4,7 +4,7 @@ import '../../theme/colors.dart';
 /// Variantes del botón primario.
 enum ButtonVariant { primary, secondary, ghost }
 
-/// Botón institucional reutilizable para UPSGlam.
+/// Botón institucional reutilizable para UPStagram.
 /// Soporta:
 /// - Estados: loading, disabled
 /// - Variantes: primary, secondary, ghost

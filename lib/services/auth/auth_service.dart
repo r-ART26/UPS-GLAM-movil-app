@@ -119,5 +119,37 @@ class AuthService {
       return null;
     }
   }
+
+  /// Obtiene el nombre del usuario desde el token JWT.
+  /// Retorna null si no se puede obtener.
+  static Future<String?> getUserName() async {
+    try {
+      final token = await getToken();
+      if (token == null) return null;
+      
+      final payload = getTokenPayload(token);
+      if (payload == null) return null;
+      
+      return payload['name'] as String?;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Obtiene el email del usuario desde el token JWT.
+  /// Retorna null si no se puede obtener.
+  static Future<String?> getUserEmail() async {
+    try {
+      final token = await getToken();
+      if (token == null) return null;
+      
+      final payload = getTokenPayload(token);
+      if (payload == null) return null;
+      
+      return payload['email'] as String?;
+    } catch (e) {
+      return null;
+    }
+  }
 }
 

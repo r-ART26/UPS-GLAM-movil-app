@@ -10,7 +10,7 @@ import '../../../services/config/app_config_service.dart';
 import '../../../services/auth/auth_service.dart';
 
 
-/// Pantalla de inicio de sesión para la aplicación UPSGlam.
+/// Pantalla de inicio de sesión para la aplicación UPStagram.
 /// Con validación real usando el nuevo TextInput y PrimaryButton.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});

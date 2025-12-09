@@ -1,6 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../theme/colors.dart';
-import '../../widgets/buttons/primary_button.dart';
 
 /// Panel de parámetros para configurar filtros.
 /// Se muestra cuando un filtro con parámetros está seleccionado.
@@ -24,11 +24,18 @@ class FilterParamsPanel extends StatefulWidget {
 
 class _FilterParamsPanelState extends State<FilterParamsPanel> {
   late Map<String, dynamic> _params;
+  Timer? _debounceTimer;
 
   @override
   void initState() {
     super.initState();
     _params = Map<String, dynamic>.from(widget.initialParams);
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -38,6 +45,19 @@ class _FilterParamsPanelState extends State<FilterParamsPanel> {
     if (oldWidget.initialParams != widget.initialParams) {
       _params = Map<String, dynamic>.from(widget.initialParams);
     }
+  }
+
+  /// Verifica si el modo automático está activado
+  bool get _isAutoMode => _params['use_auto'] ?? false;
+
+  /// Aplica el filtro con debounce (espera 500ms después del último cambio)
+  void _applyFilterDebounced() {
+    _debounceTimer?.cancel(); // Cancelar timer anterior si existe
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      if (!_isAutoMode && mounted) {
+        widget.onApply(_params);
+      }
+    });
   }
 
   @override
@@ -52,12 +72,6 @@ class _FilterParamsPanelState extends State<FilterParamsPanel> {
           const SizedBox(height: 16),
         ],
         _buildParams(),
-        const SizedBox(height: 16),
-        // Solo botón Aplicar
-        PrimaryButton(
-          label: 'Aplicar',
-          onPressed: () => widget.onApply(_params),
-        ),
       ],
     );
   }
@@ -90,20 +104,23 @@ class _FilterParamsPanelState extends State<FilterParamsPanel> {
           onChanged: (value) {
             setState(() {
               _params['use_auto'] = value;
-              if (value) {
-                // Si se activa automático, aplicar inmediatamente
-                widget.onAuto();
-              }
             });
+            // Cancelar cualquier debounce pendiente
+            _debounceTimer?.cancel();
+            // Aplicar filtro automáticamente cuando cambia el switch
+            if (value) {
+              // Si se activa automático, usar parámetros automáticos
+              widget.onAuto();
+            } else {
+              // Si se desactiva, aplicar con los parámetros actuales inmediatamente
+              widget.onApply(_params);
+            }
           },
           activeColor: AppColors.upsYellow,
         ),
       ],
     );
   }
-
-  /// Verifica si el modo automático está activado
-  bool get _isAutoMode => _params['use_auto'] ?? false;
 
   Widget _buildParams() {
     switch (widget.filterName.toLowerCase()) {
@@ -137,6 +154,8 @@ class _FilterParamsPanelState extends State<FilterParamsPanel> {
             setState(() {
               _params['kernel_size'] = value.toInt();
             });
+            // Aplicar filtro automáticamente cuando cambia el parámetro (con debounce)
+            _applyFilterDebounced();
           },
         ),
         _buildSlider(
@@ -150,6 +169,8 @@ class _FilterParamsPanelState extends State<FilterParamsPanel> {
             setState(() {
               _params['sigma'] = value.toInt();
             });
+            // Aplicar filtro automáticamente cuando cambia el parámetro (con debounce)
+            _applyFilterDebounced();
           },
         ),
         _buildSlider(
@@ -166,6 +187,8 @@ class _FilterParamsPanelState extends State<FilterParamsPanel> {
             setState(() {
               _params['low_threshold'] = value.toInt().toString();
             });
+            // Aplicar filtro automáticamente cuando cambia el parámetro (con debounce)
+            _applyFilterDebounced();
           },
         ),
         _buildSlider(
@@ -182,6 +205,8 @@ class _FilterParamsPanelState extends State<FilterParamsPanel> {
             setState(() {
               _params['high_threshold'] = value.toInt().toString();
             });
+            // Aplicar filtro automáticamente cuando cambia el parámetro (con debounce)
+            _applyFilterDebounced();
           },
         ),
       ],
@@ -203,6 +228,8 @@ class _FilterParamsPanelState extends State<FilterParamsPanel> {
             setState(() {
               _params['kernel_size'] = value.toInt();
             });
+            // Aplicar filtro automáticamente cuando cambia el parámetro (con debounce)
+            _applyFilterDebounced();
           },
         ),
         _buildSlider(
@@ -216,6 +243,8 @@ class _FilterParamsPanelState extends State<FilterParamsPanel> {
             setState(() {
               _params['sigma'] = value.toInt();
             });
+            // Aplicar filtro automáticamente cuando cambia el parámetro (con debounce)
+            _applyFilterDebounced();
           },
         ),
       ],
@@ -237,6 +266,8 @@ class _FilterParamsPanelState extends State<FilterParamsPanel> {
             setState(() {
               _params['kernel_size'] = value.toInt();
             });
+            // Aplicar filtro automáticamente cuando cambia el parámetro (con debounce)
+            _applyFilterDebounced();
           },
         ),
         _buildSlider(
@@ -250,6 +281,8 @@ class _FilterParamsPanelState extends State<FilterParamsPanel> {
             setState(() {
               _params['bias_value'] = value.toInt();
             });
+            // Aplicar filtro automáticamente cuando cambia el parámetro (con debounce)
+            _applyFilterDebounced();
           },
         ),
       ],
@@ -271,6 +304,8 @@ class _FilterParamsPanelState extends State<FilterParamsPanel> {
             setState(() {
               _params['scale'] = value;
             });
+            // Aplicar filtro automáticamente cuando cambia el parámetro (con debounce)
+            _applyFilterDebounced();
           },
         ),
         _buildSlider(
@@ -284,6 +319,8 @@ class _FilterParamsPanelState extends State<FilterParamsPanel> {
             setState(() {
               _params['transparency'] = value;
             });
+            // Aplicar filtro automáticamente cuando cambia el parámetro (con debounce)
+            _applyFilterDebounced();
           },
         ),
         _buildSlider(
@@ -297,6 +334,8 @@ class _FilterParamsPanelState extends State<FilterParamsPanel> {
             setState(() {
               _params['spacing'] = value;
             });
+            // Aplicar filtro automáticamente cuando cambia el parámetro (con debounce)
+            _applyFilterDebounced();
           },
         ),
       ],
@@ -318,6 +357,8 @@ class _FilterParamsPanelState extends State<FilterParamsPanel> {
             setState(() {
               _params['edge_threshold'] = value.toInt();
             });
+            // Aplicar filtro automáticamente cuando cambia el parámetro (con debounce)
+            _applyFilterDebounced();
           },
         ),
         _buildSlider(
@@ -331,6 +372,8 @@ class _FilterParamsPanelState extends State<FilterParamsPanel> {
             setState(() {
               _params['color_levels'] = value.toInt();
             });
+            // Aplicar filtro automáticamente cuando cambia el parámetro (con debounce)
+            _applyFilterDebounced();
           },
         ),
         _buildSlider(
@@ -344,6 +387,8 @@ class _FilterParamsPanelState extends State<FilterParamsPanel> {
             setState(() {
               _params['saturation'] = value;
             });
+            // Aplicar filtro automáticamente cuando cambia el parámetro (con debounce)
+            _applyFilterDebounced();
           },
         ),
       ],

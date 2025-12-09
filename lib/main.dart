@@ -24,7 +24,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'UPSGlam 2.0',
+      title: 'UPStagram 2.0',
       debugShowCheckedModeBanner: false,
 
       theme: AppTheme.light,

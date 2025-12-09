@@ -122,7 +122,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     children: const [
                       Text('UPS', style: AppTypography.titleUPS),
                       SizedBox(width: 4),
-                      Text('Glam', style: AppTypography.titleGlam),
+                      Text('tagram', style: AppTypography.titleGlam),
                     ],
                   ),
 
