@@ -91,7 +91,7 @@ La configuración se guarda localmente y se utiliza para todas las peticiones al
      4. Descarga el archivo `google-services.json` para Android
      5. Colócalo en `android/app/`
 
-3. **`ios/Runner/GoogleService-Info.plist`**
+3. **`ios/Runner/GoogleService-Info.plist`** (Opcional)
    - **Ubicación:** `ios/Runner/GoogleService-Info.plist`
    - **Descripción:** Archivo de configuración de Google Services para iOS
    - **Cómo obtenerlo:**
