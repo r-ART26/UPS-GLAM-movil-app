@@ -5,8 +5,45 @@ import '../../theme/colors.dart';
 import '../../widgets/effects/gradient_background.dart';
 import '../../../services/auth/auth_service.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  String? _userName;
+  String? _userEmail;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  /// Carga los datos del usuario desde el token JWT
+  Future<void> _loadUserData() async {
+    try {
+      final name = await AuthService.getUserName();
+      final email = await AuthService.getUserEmail();
+      
+      if (mounted) {
+        setState(() {
+          _userName = name;
+          _userEmail = email;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   /// Muestra el diálogo de configuración con opción de cerrar sesión
   void _showSettingsDialog(BuildContext context) {
@@ -166,24 +203,35 @@ class ProfileScreen extends StatelessWidget {
 
                   const SizedBox(height: 12),
 
-                  const Text(
-                    'Roberto Romero',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  _isLoading
+                      ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Text(
+                          _userName ?? 'Usuario',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
 
                   const SizedBox(height: 4),
 
-                  const Text(
-                    'roberto@est.ups.edu.ec',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
-                  ),
+                  _isLoading
+                      ? const SizedBox(height: 20)
+                      : Text(
+                          _userEmail ?? 'No disponible',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                        ),
 
                   const SizedBox(height: 20),
 
