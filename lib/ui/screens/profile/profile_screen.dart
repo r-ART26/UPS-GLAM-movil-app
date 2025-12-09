@@ -67,6 +67,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
+                leading: const Icon(Icons.edit, color: Colors.white),
+                title: const Text(
+                  'Editar perfil',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.of(dialogContext).pop();
+                  // TODO: Navegar a "editar perfil"
+                },
+              ),
+              const Divider(color: Colors.white24),
+              ListTile(
                 leading: const Icon(Icons.logout, color: Colors.redAccent),
                 title: const Text(
                   'Cerrar sesión',
@@ -249,33 +264,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: 20),
-
-                  // ===========================
-                  // BOTÓN EDITAR PERFIL
-                  // ===========================
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        // TODO: Navegar a "editar perfil"
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      child: const Text(
-                        'Editar perfil',
-                        style: TextStyle(fontSize: 16),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 8),
                 ],
               ),
             ),
