@@ -126,7 +126,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         await ErrorDialog.show(
           context,
           title: 'Error al cargar perfil',
-          message: 'No se pudieron cargar los datos del perfil. Por favor, intenta nuevamente.',
+          message:
+              'No se pudieron cargar los datos del perfil. Por favor, intenta nuevamente.',
         );
       }
     }
@@ -425,8 +426,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 20),
 
                   // Botón de seguir/dejar de seguir (solo si no es mi perfil)
-                  if (_currentUserId != null && 
-                      _myUserId != null && 
+                  if (_currentUserId != null &&
+                      _myUserId != null &&
                       _currentUserId != _myUserId)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 16),
@@ -529,7 +530,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           final data = doc.data() as Map<String, dynamic>;
                           final img = data['pos_imageUrl'] as String? ?? '';
                           final caption = data['pos_caption'] as String? ?? '';
-                          final authorUid = data['pos_authorUid'] as String? ?? targetUid;
+                          final authorUid =
+                              data['pos_authorUid'] as String? ?? targetUid;
                           final postId = doc.id;
 
                           return GestureDetector(
@@ -651,11 +653,7 @@ class _StatItem extends StatelessWidget {
   final String value;
   final VoidCallback? onTap;
 
-  const _StatItem({
-    required this.label,
-    required this.value,
-    this.onTap,
-  });
+  const _StatItem({required this.label, required this.value, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -678,10 +676,7 @@ class _StatItem extends StatelessWidget {
     );
 
     if (onTap != null) {
-      return GestureDetector(
-        onTap: onTap,
-        child: widget,
-      );
+      return GestureDetector(onTap: onTap, child: widget);
     }
 
     return widget;
@@ -693,10 +688,7 @@ class _UsersListBottomSheet extends StatelessWidget {
   final String title;
   final Stream<List<UserModel>> stream;
 
-  const _UsersListBottomSheet({
-    required this.title,
-    required this.stream,
-  });
+  const _UsersListBottomSheet({required this.title, required this.stream});
 
   @override
   Widget build(BuildContext context) {

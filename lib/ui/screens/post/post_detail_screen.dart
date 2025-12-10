@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme/colors.dart';
+import '../../../services/auth/auth_service.dart';
 import '../../widgets/dialogs/confirm_dialog.dart';
 import '../../widgets/like_button.dart';
 import '../../../services/posts/comment_service.dart';
@@ -27,14 +28,27 @@ class PostDetailScreen extends StatefulWidget {
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
   final TextEditingController _commentController = TextEditingController();
-  String? _currentUserId;
-  bool _isPostingComment = false;
+  String _currentUserName =
+      'Usuario'; // Nombre por defecto para el avatar propio
 
   @override
   void initState() {
     super.initState();
-    _loadCurrentUserId();
+    _loadCurrentUser(); // Nombre para UI
+    _loadCurrentUserId(); // ID para lógica
   }
+
+  Future<void> _loadCurrentUser() async {
+    final name = await AuthService.getUserName();
+    if (name != null && mounted) {
+      setState(() {
+        _currentUserName = name;
+      });
+    }
+  }
+
+  String? _currentUserId;
+  bool _isPostingComment = false;
 
   Future<void> _loadCurrentUserId() async {
     final userId = await AuthService.getUserId();
@@ -230,13 +244,17 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                     .snapshots(),
                                 builder: (context, postSnapshot) {
                                   int likesCount = 0;
-                                  if (postSnapshot.hasData && postSnapshot.data != null) {
-                                    final data = postSnapshot.data!.data() as Map<String, dynamic>?;
+                                  if (postSnapshot.hasData &&
+                                      postSnapshot.data != null) {
+                                    final data =
+                                        postSnapshot.data!.data()
+                                            as Map<String, dynamic>?;
                                     if (data != null) {
-                                      likesCount = data['pos_likesCount'] as int? ?? 0;
+                                      likesCount =
+                                          data['pos_likesCount'] as int? ?? 0;
                                     }
                                   }
-                                  
+
                                   return Text(
                                     '$likesCount Me gusta',
                                     style: const TextStyle(
@@ -319,8 +337,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           final authorUid =
                               data['com_authorUid'] as String? ?? '';
                           final commentId = docs[index].id;
-                          final isOwner = _currentUserId != null && 
-                                        _currentUserId == authorUid;
+                          final isOwner =
+                              _currentUserId != null &&
+                              _currentUserId == authorUid;
 
                           return ListTile(
                             contentPadding: const EdgeInsets.symmetric(
@@ -331,7 +350,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                             title: Padding(
                               padding: const EdgeInsets.only(bottom: 4),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Expanded(
                                     child: GestureDetector(
@@ -351,14 +371,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                       ),
                                       onPressed: () async {
                                         final confirmed = await ConfirmDialog.show(
-                                        context,
-                                        title: 'Eliminar comentario',
-                                        message: '¿Estás seguro de que deseas eliminar este comentario?',
-                                        confirmText: 'Eliminar',
-                                        cancelText: 'Cancelar',
-                                        confirmColor: Colors.redAccent,
-                                      );
-                                        
+                                          context,
+                                          title: 'Eliminar comentario',
+                                          message:
+                                              '¿Estás seguro de que deseas eliminar este comentario?',
+                                          confirmText: 'Eliminar',
+                                          cancelText: 'Cancelar',
+                                          confirmColor: Colors.redAccent,
+                                        );
+
                                         if (confirmed == true) {
                                           await CommentService.deleteComment(
                                             widget.postId,
@@ -402,10 +423,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               // Para respetar el área del iPhone X+
               child: Row(
                 children: [
-                  const CircleAvatar(
+                  CircleAvatar(
                     radius: 16,
-                    backgroundColor: Colors.grey,
-                    child: Icon(Icons.person, size: 20, color: Colors.white),
+                    backgroundColor: AppColors.upsBlue,
+                    backgroundImage: NetworkImage(
+                      'https://ui-avatars.com/api/?name=${Uri.encodeComponent(_currentUserName)}&background=003F87&color=fff&size=150&bold=true',
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -420,37 +443,41 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     ),
                   ),
                   TextButton(
-                    onPressed: _isPostingComment ? null : () async {
-                      final text = _commentController.text.trim();
-                      if (text.isEmpty) return;
-                      
-                      setState(() {
-                        _isPostingComment = true;
-                      });
-                      
-                      final success = await CommentService.createComment(
-                        widget.postId,
-                        text,
-                        context,
-                      );
-                      
-                      if (mounted) {
-                        setState(() {
-                          _isPostingComment = false;
-                        });
-                        
-                        if (success) {
-                          _commentController.clear();
-                        }
-                      }
-                    },
+                    onPressed: _isPostingComment
+                        ? null
+                        : () async {
+                            final text = _commentController.text.trim();
+                            if (text.isEmpty) return;
+
+                            setState(() {
+                              _isPostingComment = true;
+                            });
+
+                            final success = await CommentService.createComment(
+                              widget.postId,
+                              text,
+                              context,
+                            );
+
+                            if (mounted) {
+                              setState(() {
+                                _isPostingComment = false;
+                              });
+
+                              if (success) {
+                                _commentController.clear();
+                              }
+                            }
+                          },
                     child: _isPostingComment
                         ? const SizedBox(
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.upsYellow),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                AppColors.upsYellow,
+                              ),
                             ),
                           )
                         : const Text(
