@@ -19,7 +19,7 @@ import '../services/auth/auth_middleware.dart';
 /// Router central de la aplicación.
 final GoRouter appRouter = GoRouter(
   initialLocation: '/welcome',
-  
+
   // Redirección basada en autenticación
   redirect: (context, state) async {
     return await AuthMiddleware.redirect(state.uri.path);
@@ -62,6 +62,13 @@ final GoRouter appRouter = GoRouter(
         GoRoute(
           path: '/home/profile',
           builder: (context, state) => const ProfileScreen(),
+        ),
+        GoRoute(
+          path: '/profile/:uid',
+          builder: (context, state) {
+            final uid = state.pathParameters['uid'];
+            return ProfileScreen(userId: uid);
+          },
         ),
       ],
     ),

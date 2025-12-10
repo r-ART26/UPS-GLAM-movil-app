@@ -1,21 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
-import '../../theme/typography.dart';
 import '../../theme/colors.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final String postId;
   final String imageUrl;
   final String description; // pos_caption
-  final String authorName; // O el UID si no tenemos nombre
+  final String authorUid; // UID del autor para navegación
 
   const PostDetailScreen({
     super.key,
     required this.postId,
     required this.imageUrl,
     required this.description,
-    required this.authorName,
+    required this.authorUid,
   });
 
   @override
@@ -107,18 +106,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       final data = docs[index].data() as Map<String, dynamic>;
                       final authorUid = data['lik_authorUid'] as String? ?? '';
 
-                      return ListTile(
-                        leading: const CircleAvatar(
-                          backgroundColor: AppColors.upsBlue,
-                          radius: 18,
-                          child: Icon(
-                            Icons.person,
-                            size: 20,
-                            color: Colors.white,
-                          ),
+                      return InkWell(
+                        onTap: () =>
+                            GoRouter.of(context).push('/profile/$authorUid'),
+                        child: ListTile(
+                          // Quitamos el leading porque _UserNameFetcher ya trae avatar
+                          title: _UserNameFetcher(uid: authorUid),
                         ),
-                        // Reusamos nuestro fetcher inteligente para mostrar el nombre
-                        title: _UserNameFetcher(uid: authorUid),
                       );
                     },
                   );
@@ -167,13 +161,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          widget.authorName, // Autor del post
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
+                        // Nombre Autor (Clicable)
+                        GestureDetector(
+                          onTap: () {
+                            GoRouter.of(
+                              context,
+                            ).push('/profile/${widget.authorUid}');
+                          },
+                          child: _UserNameFetcher(uid: widget.authorUid),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -277,16 +272,20 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                               data['com_authorUid'] as String? ?? '';
 
                           return ListTile(
-                            leading: const CircleAvatar(
-                              backgroundColor: AppColors.upsBlue,
-                              radius: 16,
-                              child: Icon(
-                                Icons.person,
-                                size: 16,
-                                color: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 4,
+                            ),
+                            // El Avatar ya viene dentro de _UserNameFetcher en el título
+                            title: Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: GestureDetector(
+                                onTap: () => GoRouter.of(
+                                  context,
+                                ).push('/profile/$authorUid'),
+                                child: _UserNameFetcher(uid: authorUid),
                               ),
                             ),
-                            title: _UserNameFetcher(uid: authorUid),
                             subtitle: Text(
                               commentText,
                               style: const TextStyle(
@@ -375,47 +374,102 @@ class _UserNameFetcher extends StatelessWidget {
   Widget build(BuildContext context) {
     // Si no hay UID válido
     if (uid.isEmpty) {
-      return const Text(
-        'Usuario UPS',
-        style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w600,
-          fontSize: 13,
-        ),
+      return Row(
+        mainAxisSize: MainAxisSize.min, // Importante para no expandir el Layout
+        children: const [
+          CircleAvatar(
+            radius: 14,
+            backgroundColor: Colors.grey,
+            child: Icon(Icons.person, size: 16, color: Colors.white),
+          ),
+          SizedBox(width: 8),
+          Text(
+            'Usuario UPS',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+          ),
+        ],
       );
     }
 
     return FutureBuilder<DocumentSnapshot>(
       future: FirebaseFirestore.instance.collection('Users').doc(uid).get(),
       builder: (context, snapshot) {
-        // 1. Cargando o esperando
+        // 1. Cargando
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Container(
-            width: 60,
-            height: 12,
-            decoration: BoxDecoration(
-              color: Colors.white10,
-              borderRadius: BorderRadius.circular(4),
-            ),
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: const BoxDecoration(
+                  color: Colors.white10,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 60,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: Colors.white10,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ],
           );
         }
 
-        // 2. Extraer nombre
+        // 2. Extraer datos
         String name = 'Usuario UPS';
+        String? photoUrl;
+
         if (snapshot.hasData &&
             snapshot.data != null &&
             snapshot.data!.exists) {
           final data = snapshot.data!.data() as Map<String, dynamic>?;
           name = data?['usr_username'] as String? ?? 'Usuario UPS';
+          photoUrl = data?['usr_photoUrl'] as String?;
         }
 
-        return Text(
-          name,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-            fontSize: 13,
-          ),
+        // 3. Lógica de Avatar
+        ImageProvider? avatarImage;
+        if (photoUrl != null && photoUrl.isNotEmpty) {
+          avatarImage = NetworkImage(photoUrl);
+        } else {
+          // Generar avatar con iniciales si no hay foto
+          final safeName = Uri.encodeComponent(name);
+          avatarImage = NetworkImage(
+            'https://ui-avatars.com/api/?name=$safeName&background=003F87&color=fff&size=150&bold=true',
+          );
+        }
+
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Avatar
+            CircleAvatar(
+              radius: 14,
+              backgroundColor: AppColors.upsBlue,
+              backgroundImage: avatarImage,
+            ),
+
+            const SizedBox(width: 8),
+
+            // Nombre
+            Text(
+              name,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ],
         );
       },
     );
