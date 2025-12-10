@@ -6,6 +6,7 @@ import '../../../services/users/user_search_service.dart';
 import '../../../services/posts/random_posts_service.dart';
 import '../../../models/user_model.dart';
 import '../../widgets/user_list_item.dart';
+import '../post/post_detail_screen.dart';
 
 /// Pantalla de búsqueda de usuarios estilo Instagram.
 class SearchScreen extends StatefulWidget {
@@ -67,13 +68,13 @@ class _SearchScreenState extends State<SearchScreen> {
                   decoration: InputDecoration(
                     hintText: 'Buscar usuarios...',
                     hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
-                    prefixIcon: const Icon(
-                      Icons.search,
-                      color: Colors.white70,
-                    ),
+                    prefixIcon: const Icon(Icons.search, color: Colors.white70),
                     suffixIcon: _currentQuery.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.clear, color: Colors.white70),
+                            icon: const Icon(
+                              Icons.clear,
+                              color: Colors.white70,
+                            ),
                             onPressed: () {
                               _searchController.clear();
                               setState(() {
@@ -112,7 +113,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   /// Construye la cuadrícula de fotos aleatorias
   Widget _buildPhotosGrid() {
-    return StreamBuilder<List<String>>(
+    return StreamBuilder<List<Map<String, dynamic>>>(
       stream: RandomPostsService.getRandomPostsStream(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -130,7 +131,7 @@ class _SearchScreenState extends State<SearchScreen> {
           );
         }
 
-        final imageUrls = snapshot.data!;
+        final posts = snapshot.data!;
 
         return GridView.builder(
           padding: const EdgeInsets.all(2),
@@ -139,16 +140,28 @@ class _SearchScreenState extends State<SearchScreen> {
             mainAxisSpacing: 2,
             crossAxisSpacing: 2,
           ),
-          itemCount: imageUrls.length,
+          itemCount: posts.length,
           itemBuilder: (context, index) {
+            final post = posts[index];
+            final imageUrl = post['imageUrl'] as String;
+
             return GestureDetector(
               onTap: () {
-                // TODO: Navegar al post o perfil del autor
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => PostDetailScreen(
+                      postId: post['postId'],
+                      imageUrl: imageUrl,
+                      description: post['description'],
+                      authorUid: post['authorUid'],
+                    ),
+                  ),
+                );
               },
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(4),
                 child: Image.network(
-                  imageUrls[index],
+                  imageUrl,
                   fit: BoxFit.cover,
                   loadingBuilder: (context, child, loadingProgress) {
                     if (loadingProgress == null) return child;
@@ -228,4 +241,3 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 }
-
