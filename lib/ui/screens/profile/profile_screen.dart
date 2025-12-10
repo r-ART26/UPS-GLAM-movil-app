@@ -10,6 +10,7 @@ import '../../widgets/user_list_item.dart';
 import '../../../services/auth/auth_service.dart';
 import '../../../services/subscriptions/subscription_service.dart';
 import '../../../models/user_model.dart';
+import '../post/post_detail_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? userId; // Si es null, es MI perfil
@@ -475,15 +476,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Expanded(
               child: Builder(
                 builder: (context) {
-                  // Si no tenemos ID (caso "Mi Perfil" sin UID resuelto), mostramos vacío o error
-                  // *Nota*: Para ver TOMAR tus posts, necesitaríamos saber TU uid.
-                  // Si estamos viendo OTRO perfil, usamos widget.userId.
-                  final targetUid = widget.userId;
+                  // Usar _currentUserId que ya está establecido correctamente
+                  // (widget.userId si es otro perfil, o _myUserId si es mi perfil)
+                  final targetUid = _currentUserId;
 
                   if (targetUid == null) {
                     return const Center(
                       child: Text(
-                        'Mis posts (WIP)',
+                        'Cargando publicaciones...',
                         style: TextStyle(color: Colors.white54),
                       ),
                     );
@@ -525,12 +525,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               crossAxisSpacing: 6,
                             ),
                         itemBuilder: (context, i) {
-                          final data = docs[i].data() as Map<String, dynamic>;
+                          final doc = docs[i];
+                          final data = doc.data() as Map<String, dynamic>;
                           final img = data['pos_imageUrl'] as String? ?? '';
+                          final caption = data['pos_caption'] as String? ?? '';
+                          final authorUid = data['pos_authorUid'] as String? ?? targetUid;
+                          final postId = doc.id;
 
                           return GestureDetector(
                             onTap: () {
-                              // Opcional: Ir al detalle del post
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => PostDetailScreen(
+                                    postId: postId,
+                                    imageUrl: img,
+                                    description: caption,
+                                    authorUid: authorUid,
+                                  ),
+                                ),
+                              );
                             },
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(10),
