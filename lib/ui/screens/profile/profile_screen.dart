@@ -338,9 +338,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 children: [
-                  const CircleAvatar(
+                  CircleAvatar(
                     radius: 46,
-                    backgroundImage: NetworkImage('https://picsum.photos/200'),
+                    backgroundColor: AppColors.upsBlue,
+                    backgroundImage:
+                        (_photoUrl != null && _photoUrl!.isNotEmpty)
+                        ? NetworkImage(_photoUrl!)
+                        : NetworkImage(
+                            'https://ui-avatars.com/api/?name=${Uri.encodeComponent(_userName ?? 'Usuario')}&background=003F87&color=fff&size=200&bold=true',
+                          ),
                   ),
 
                   const SizedBox(height: 12),

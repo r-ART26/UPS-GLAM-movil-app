@@ -436,6 +436,18 @@ class _UserNameFetcher extends StatelessWidget {
           photoUrl = data?['usr_photoUrl'] as String?;
         }
 
+        // 3. Lógica de Avatar
+        ImageProvider? avatarImage;
+        if (photoUrl != null && photoUrl.isNotEmpty) {
+          avatarImage = NetworkImage(photoUrl);
+        } else {
+          // Generar avatar con iniciales si no hay foto
+          final safeName = Uri.encodeComponent(name);
+          avatarImage = NetworkImage(
+            'https://ui-avatars.com/api/?name=$safeName&background=003F87&color=fff&size=150&bold=true',
+          );
+        }
+
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -443,12 +455,7 @@ class _UserNameFetcher extends StatelessWidget {
             CircleAvatar(
               radius: 14,
               backgroundColor: AppColors.upsBlue,
-              backgroundImage: (photoUrl != null && photoUrl.isNotEmpty)
-                  ? NetworkImage(photoUrl)
-                  : null,
-              child: (photoUrl == null || photoUrl.isEmpty)
-                  ? const Icon(Icons.person, size: 16, color: Colors.white)
-                  : null,
+              backgroundImage: avatarImage,
             ),
 
             const SizedBox(width: 8),

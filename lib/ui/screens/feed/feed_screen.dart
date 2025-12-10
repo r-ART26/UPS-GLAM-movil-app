@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:go_router/go_router.dart';
 import '../../theme/typography.dart';
 import '../../theme/colors.dart';
 import '../../widgets/effects/gradient_background.dart';
@@ -211,7 +212,13 @@ class FeedScreen extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     // Nombre dinámico desde Firebase 'Users'
-                    _UserNameFetcher(uid: authorUid),
+                    // Nombre dinámico desde Firebase 'Users'
+                    GestureDetector(
+                      onTap: () {
+                        GoRouter.of(context).push('/profile/$authorUid');
+                      },
+                      child: _UserNameFetcher(uid: authorUid),
+                    ),
 
                     Text(
                       timeAgo,
@@ -376,19 +383,27 @@ class _UserNameFetcher extends StatelessWidget {
           photoUrl = data?['usr_photoUrl'] as String?;
         }
 
+        // 3. Lógica de Avatar
+        ImageProvider? avatarImage;
+        if (photoUrl != null && photoUrl.isNotEmpty) {
+          avatarImage = NetworkImage(photoUrl);
+        } else {
+          // Generar avatar con iniciales si no hay foto
+          // Usamos el azul UPS (003F87) de fondo y letras blancas
+          final safeName = Uri.encodeComponent(name);
+          avatarImage = NetworkImage(
+            'https://ui-avatars.com/api/?name=$safeName&background=003F87&color=fff&size=150&bold=true',
+          );
+        }
+
         return Row(
           children: [
             // Avatar
             CircleAvatar(
               radius: 14,
-              backgroundColor:
-                  AppColors.upsBlue, // Color de fondo si no hay foto
-              backgroundImage: (photoUrl != null && photoUrl.isNotEmpty)
-                  ? NetworkImage(photoUrl)
-                  : null,
-              child: (photoUrl == null || photoUrl.isEmpty)
-                  ? const Icon(Icons.person, size: 16, color: Colors.white)
-                  : null,
+              backgroundColor: AppColors.upsBlue,
+              backgroundImage: avatarImage,
+              // Ya no necesitamos child Icon porque siempre habrá imagen (real o generada)
             ),
 
             const SizedBox(width: 8),
