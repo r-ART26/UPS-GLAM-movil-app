@@ -6,6 +6,7 @@ import '../../theme/typography.dart';
 import '../../widgets/buttons/primary_button.dart';
 import '../../widgets/effects/gradient_background.dart';
 import '../../widgets/inputs/text_input.dart';
+import '../../widgets/dialogs/error_dialog.dart';
 import '../../../services/api/api_service.dart';
 import '../../../services/config/app_config_service.dart';
 
@@ -64,7 +65,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? _emailError;
   String? _passwordError;
   String? _confirmPasswordError;
-  String? _generalError;
 
   // Estado del botón
   bool _isLoading = false;
@@ -114,7 +114,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _emailError = null;
       _passwordError = null;
       _confirmPasswordError = null;
-      _generalError = null;
 
       if (!_isValidName(name)) {
         _nameError = 'Ingrese nombre y apellido válidos';
@@ -140,9 +139,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     // Verificar conexión antes de intentar registro
     if (_isConnected == false) {
-      setState(() {
-        _generalError = 'No se puede conectar al servidor. Verifica la IP configurada.';
-      });
+      if (mounted) {
+        await ErrorDialog.show(
+          context,
+          title: 'Error de conexión',
+          message: 'No se puede conectar al servidor. Verifica la IP configurada.',
+        );
+      }
       return;
     }
 
@@ -178,15 +181,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
       } else if (response.statusCode == 409) {
         // Email ya existe
         setState(() {
-          _generalError = 'Este correo ya está registrado. Intenta iniciar sesión.';
           _isLoading = false;
         });
+        if (mounted) {
+          await ErrorDialog.show(
+            context,
+            title: 'Correo ya registrado',
+            message: 'Este correo ya está registrado. Intenta iniciar sesión.',
+          );
+        }
       } else {
         // Error del servidor
         setState(() {
-          _generalError = 'Error del servidor. Intenta nuevamente.';
           _isLoading = false;
         });
+        if (mounted) {
+          await ErrorDialog.show(
+            context,
+            title: 'Error del servidor',
+            message: 'Ocurrió un error al intentar registrarte. Por favor, intenta nuevamente.',
+          );
+        }
       }
     } catch (e) {
       if (!mounted) return;
@@ -194,17 +209,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
       debugPrint('Error en registro: $e');
       setState(() {
         _isLoading = false;
-
-        // Detectar tipo de error
-        if (e.toString().contains('Failed host lookup') ||
-            e.toString().contains('Connection refused') ||
-            e.toString().contains('SocketException')) {
-          _generalError = 'No se puede conectar al servidor. Verifica que esté corriendo y la IP sea correcta.';
-          _isConnected = false;
-        } else {
-          _generalError = 'Error de conexión. Verifica tu conexión a internet.';
-        }
       });
+
+      // Detectar tipo de error
+      String errorMessage;
+      String errorTitle;
+      if (e.toString().contains('Failed host lookup') ||
+          e.toString().contains('Connection refused') ||
+          e.toString().contains('SocketException')) {
+        errorTitle = 'Error de conexión';
+        errorMessage = 'No se puede conectar al servidor. Verifica que esté corriendo y la IP sea correcta.';
+        _isConnected = false;
+      } else {
+        errorTitle = 'Error de conexión';
+        errorMessage = 'Error de conexión. Verifica tu conexión a internet.';
+      }
+
+      await ErrorDialog.show(
+        context,
+        title: errorTitle,
+        message: errorMessage,
+      );
     }
   }
 
@@ -321,34 +346,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
 
                     const SizedBox(height: 16),
-
-                    /// Mensaje de error general
-                    if (_generalError != null)
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.redAccent.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.error_outline, color: Colors.redAccent, size: 20),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _generalError!,
-                                style: const TextStyle(
-                                  color: Colors.redAccent,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    if (_generalError != null) const SizedBox(height: 16),
 
                     /// Botón para registrar
                     PrimaryButton(

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../theme/typography.dart';
 import '../../theme/colors.dart';
 import '../../widgets/effects/gradient_background.dart';
+import '../../widgets/dialogs/error_dialog.dart';
 import '../../../services/auth/auth_service.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -87,7 +88,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } catch (e) {
       debugPrint('Error cargando perfil: $e');
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+        await ErrorDialog.show(
+          context,
+          title: 'Error al cargar perfil',
+          message: 'No se pudieron cargar los datos del perfil. Por favor, intenta nuevamente.',
+        );
+      }
     }
   }
 

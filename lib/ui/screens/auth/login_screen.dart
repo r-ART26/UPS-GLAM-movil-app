@@ -4,6 +4,7 @@ import '../../theme/typography.dart';
 import '../../widgets/buttons/primary_button.dart';
 import '../../widgets/effects/gradient_background.dart';
 import '../../widgets/inputs/text_input.dart';
+import '../../widgets/dialogs/error_dialog.dart';
 import 'package:go_router/go_router.dart';
 import '../../../services/api/api_service.dart';
 import '../../../services/config/app_config_service.dart';
@@ -60,7 +61,6 @@ class _LoginScreenState extends State<LoginScreen> {
   // Variables para mostrar los errores en pantalla
   String? _emailError;
   String? _passwordError;
-  String? _generalError;
 
   // Estado de carga del botón
   bool _isLoading = false;
@@ -95,7 +95,6 @@ class _LoginScreenState extends State<LoginScreen> {
       // Reset errores
       _emailError = null;
       _passwordError = null;
-      _generalError = null;
 
       // Validación de correo
       if (!_isValidEmail(email)) {
@@ -113,9 +112,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
     // Verificar conexión antes de intentar login
     if (_isConnected == false) {
-      setState(() {
-        _generalError = 'No se puede conectar al servidor. Verifica la IP configurada.';
-      });
+      if (mounted) {
+        await ErrorDialog.show(
+          context,
+          title: 'Error de conexión',
+          message: 'No se puede conectar al servidor. Verifica la IP configurada.',
+        );
+      }
       return;
     }
 
@@ -146,9 +149,13 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!saved) {
           if (mounted) {
             setState(() {
-              _generalError = 'Error al guardar la sesión. Intenta nuevamente.';
               _isLoading = false;
             });
+            await ErrorDialog.show(
+              context,
+              title: 'Error',
+              message: 'Error al guardar la sesión. Intenta nuevamente.',
+            );
           }
           return;
         }
@@ -160,15 +167,27 @@ class _LoginScreenState extends State<LoginScreen> {
       } else if (response.statusCode == 401) {
         // Credenciales inválidas
         setState(() {
-          _generalError = 'Error al iniciar sesión';
           _isLoading = false;
         });
+        if (mounted) {
+          await ErrorDialog.show(
+            context,
+            title: 'Error de autenticación',
+            message: 'Credenciales incorrectas. Verifica tu correo y contraseña.',
+          );
+        }
       } else {
         // Error del servidor
         setState(() {
-          _generalError = 'Error al iniciar sesión';
           _isLoading = false;
         });
+        if (mounted) {
+          await ErrorDialog.show(
+            context,
+            title: 'Error del servidor',
+            message: 'Ocurrió un error al intentar iniciar sesión. Por favor, intenta nuevamente.',
+          );
+        }
       }
     } catch (e) {
       if (!mounted) return;
@@ -176,17 +195,27 @@ class _LoginScreenState extends State<LoginScreen> {
       debugPrint('Error en login: $e');
       setState(() {
         _isLoading = false;
-        
-        // Detectar tipo de error
-        if (e.toString().contains('Failed host lookup') || 
-            e.toString().contains('Connection refused') ||
-            e.toString().contains('SocketException')) {
-          _generalError = 'No se puede conectar al servidor. Verifica que esté corriendo y la IP sea correcta.';
-          _isConnected = false;
-        } else {
-          _generalError = 'Error de conexión. Verifica tu conexión a internet.';
-        }
       });
+      
+      // Detectar tipo de error
+      String errorMessage;
+      String errorTitle;
+      if (e.toString().contains('Failed host lookup') || 
+          e.toString().contains('Connection refused') ||
+          e.toString().contains('SocketException')) {
+        errorTitle = 'Error de conexión';
+        errorMessage = 'No se puede conectar al servidor. Verifica que esté corriendo y la IP sea correcta.';
+        _isConnected = false;
+      } else {
+        errorTitle = 'Error de conexión';
+        errorMessage = 'Error de conexión. Verifica tu conexión a internet.';
+      }
+      
+      await ErrorDialog.show(
+        context,
+        title: errorTitle,
+        message: errorMessage,
+      );
     }
   }
 
@@ -282,35 +311,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
 
                     const SizedBox(height: 16),
-
-                    /// Mensaje de error general
-                    if (_generalError != null)
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.redAccent.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.error_outline, color: Colors.redAccent, size: 20),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _generalError!,
-                                style: const TextStyle(
-                                  color: Colors.redAccent,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    if (_generalError != null) const SizedBox(height: 16),
 
                     /// Botón para iniciar sesión
                     PrimaryButton(
