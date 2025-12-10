@@ -220,6 +220,11 @@ flutter run
 flutter build apk --release
 ```
 
+```bash
+flutter build apk
+flutter install
+```
+
 ### Modo Release (iOS)
 
 ```bash
