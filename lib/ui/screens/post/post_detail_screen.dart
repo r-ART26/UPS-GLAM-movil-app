@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme/colors.dart';
+import '../../widgets/dialogs/confirm_dialog.dart';
+import '../../widgets/like_button.dart';
+import '../../../services/posts/comment_service.dart';
+import '../../../services/auth/auth_service.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final String postId;
@@ -23,6 +27,29 @@ class PostDetailScreen extends StatefulWidget {
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
   final TextEditingController _commentController = TextEditingController();
+  String? _currentUserId;
+  bool _isPostingComment = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentUserId();
+  }
+
+  Future<void> _loadCurrentUserId() async {
+    final userId = await AuthService.getUserId();
+    if (mounted) {
+      setState(() {
+        _currentUserId = userId;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
 
   // Referencia a Firestore para leer comentarios
   Stream<QuerySnapshot> get _commentsStream {
@@ -180,27 +207,48 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                         ),
                         const SizedBox(height: 12),
 
-                        // Botón para ver Likes
-                        GestureDetector(
-                          onTap: () => _showLikesModal(context),
-                          child: Row(
-                            children: const [
-                              Icon(
-                                Icons.favorite,
-                                size: 16,
-                                color: Colors.white54,
+                        // Botón para dar like y ver Likes
+                        Row(
+                          children: [
+                            // Botón de like con animación
+                            LikeButton(
+                              postId: widget.postId,
+                              initialLikesCount: 0,
+                              iconSize: 20,
+                              likedColor: Colors.redAccent,
+                              unlikedColor: Colors.white54,
+                              showCount: false,
+                            ),
+                            const SizedBox(width: 8),
+                            // Contador de likes y botón para ver lista
+                            GestureDetector(
+                              onTap: () => _showLikesModal(context),
+                              child: StreamBuilder<DocumentSnapshot>(
+                                stream: FirebaseFirestore.instance
+                                    .collection('Posts')
+                                    .doc(widget.postId)
+                                    .snapshots(),
+                                builder: (context, postSnapshot) {
+                                  int likesCount = 0;
+                                  if (postSnapshot.hasData && postSnapshot.data != null) {
+                                    final data = postSnapshot.data!.data() as Map<String, dynamic>?;
+                                    if (data != null) {
+                                      likesCount = data['pos_likesCount'] as int? ?? 0;
+                                    }
+                                  }
+                                  
+                                  return Text(
+                                    '$likesCount Me gusta',
+                                    style: const TextStyle(
+                                      color: Colors.white54,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  );
+                                },
                               ),
-                              SizedBox(width: 6),
-                              Text(
-                                'Ver Me gusta',
-                                style: TextStyle(
-                                  color: Colors.white54,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -270,6 +318,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           // Usamos el UID del autor del comentario
                           final authorUid =
                               data['com_authorUid'] as String? ?? '';
+                          final commentId = docs[index].id;
+                          final isOwner = _currentUserId != null && 
+                                        _currentUserId == authorUid;
 
                           return ListTile(
                             contentPadding: const EdgeInsets.symmetric(
@@ -279,11 +330,45 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                             // El Avatar ya viene dentro de _UserNameFetcher en el título
                             title: Padding(
                               padding: const EdgeInsets.only(bottom: 4),
-                              child: GestureDetector(
-                                onTap: () => GoRouter.of(
-                                  context,
-                                ).push('/profile/$authorUid'),
-                                child: _UserNameFetcher(uid: authorUid),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: GestureDetector(
+                                      onTap: () => GoRouter.of(
+                                        context,
+                                      ).push('/profile/$authorUid'),
+                                      child: _UserNameFetcher(uid: authorUid),
+                                    ),
+                                  ),
+                                  // Botón de eliminar (solo si eres el dueño)
+                                  if (isOwner)
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        size: 18,
+                                        color: Colors.white38,
+                                      ),
+                                      onPressed: () async {
+                                        final confirmed = await ConfirmDialog.show(
+                                        context,
+                                        title: 'Eliminar comentario',
+                                        message: '¿Estás seguro de que deseas eliminar este comentario?',
+                                        confirmText: 'Eliminar',
+                                        cancelText: 'Cancelar',
+                                        confirmColor: Colors.redAccent,
+                                      );
+                                        
+                                        if (confirmed == true) {
+                                          await CommentService.deleteComment(
+                                            widget.postId,
+                                            commentId,
+                                            context,
+                                          );
+                                        }
+                                      },
+                                    ),
+                                ],
                               ),
                             ),
                             subtitle: Text(
@@ -335,24 +420,43 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     ),
                   ),
                   TextButton(
-                    onPressed: () {
-                      // TODO: Implementar lógica de envío (Spring Boot o Firebase directo)
+                    onPressed: _isPostingComment ? null : () async {
                       final text = _commentController.text.trim();
-                      if (text.isNotEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Funcionalidad de envío pendiente de conectar',
-                            ),
-                          ),
-                        );
-                        _commentController.clear();
+                      if (text.isEmpty) return;
+                      
+                      setState(() {
+                        _isPostingComment = true;
+                      });
+                      
+                      final success = await CommentService.createComment(
+                        widget.postId,
+                        text,
+                        context,
+                      );
+                      
+                      if (mounted) {
+                        setState(() {
+                          _isPostingComment = false;
+                        });
+                        
+                        if (success) {
+                          _commentController.clear();
+                        }
                       }
                     },
-                    child: const Text(
-                      'Publicar',
-                      style: TextStyle(color: AppColors.upsYellow),
-                    ),
+                    child: _isPostingComment
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.upsYellow),
+                            ),
+                          )
+                        : const Text(
+                            'Publicar',
+                            style: TextStyle(color: AppColors.upsYellow),
+                          ),
                   ),
                 ],
               ),

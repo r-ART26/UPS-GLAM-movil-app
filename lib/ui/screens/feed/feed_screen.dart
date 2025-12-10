@@ -4,13 +4,19 @@ import 'package:go_router/go_router.dart';
 import '../../theme/typography.dart';
 import '../../theme/colors.dart';
 import '../../widgets/effects/gradient_background.dart';
+import '../../widgets/like_button.dart';
 import '../../../services/posts/feed_service.dart';
 import '../post/post_detail_screen.dart';
 
 /// Pantalla principal (Feed) con integración a Firestore en Tiempo Real.
-class FeedScreen extends StatelessWidget {
+class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
 
+  @override
+  State<FeedScreen> createState() => _FeedScreenState();
+}
+
+class _FeedScreenState extends State<FeedScreen> {
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -244,45 +250,70 @@ class FeedScreen extends StatelessWidget {
                 // Barra de Acciones: Likes y Comentarios
                 Row(
                   children: [
-                    // --- LIKES ---
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.favorite_border,
-                          color: Colors.white70,
-                          size: 22,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '$likes',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
+                    // --- LIKES (Interactivo con animación) ---
+                    LikeButton(
+                      postId: docId,
+                      initialLikesCount: likes,
+                      iconSize: 22,
+                      likedColor: Colors.redAccent,
+                      unlikedColor: Colors.white70,
+                      countStyle: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
 
                     const SizedBox(width: 24), // Espacio entre grupos
-                    // --- COMENTARIOS ---
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.chat_bubble_outline,
-                          color: Colors.white70,
-                          size: 22,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '$comments',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
+                    // --- COMENTARIOS (Interactivo) ---
+                    GestureDetector(
+                      onTap: () {
+                        // Navegar a la pantalla de detalle del post
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => PostDetailScreen(
+                              postId: docId,
+                              imageUrl: imageUrl,
+                              description: caption,
+                              authorUid: authorUid,
+                            ),
                           ),
-                        ),
-                      ],
+                        );
+                      },
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.chat_bubble_outline,
+                            color: Colors.white70,
+                            size: 22,
+                          ),
+                          const SizedBox(width: 6),
+                          StreamBuilder<DocumentSnapshot>(
+                            stream: FirebaseFirestore.instance
+                                .collection('Posts')
+                                .doc(docId)
+                                .snapshots(),
+                            builder: (context, postSnapshot) {
+                              int currentComments = comments;
+                              if (postSnapshot.hasData && postSnapshot.data != null) {
+                                final data = postSnapshot.data!.data() as Map<String, dynamic>?;
+                                if (data != null) {
+                                  currentComments = data['pos_commentsCount'] as int? ?? comments;
+                                }
+                              }
+                              
+                              return Text(
+                                '$currentComments',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
