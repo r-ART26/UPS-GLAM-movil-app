@@ -5,7 +5,11 @@ import '../../theme/typography.dart';
 import '../../theme/colors.dart';
 import '../../widgets/effects/gradient_background.dart';
 import '../../widgets/dialogs/error_dialog.dart';
+import '../../widgets/follow_button.dart';
+import '../../widgets/user_list_item.dart';
 import '../../../services/auth/auth_service.dart';
+import '../../../services/subscriptions/subscription_service.dart';
+import '../../../models/user_model.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? userId; // Si es null, es MI perfil
@@ -23,6 +27,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _photoUrl;
   bool _isLoading = true;
   String? _currentUserId; // ID del perfil que estamos viendo
+  String? _myUserId; // Mi propio ID
 
   @override
   void initState() {
@@ -31,16 +36,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _initProfile() async {
-    // 1. Determinar qué ID vamos a mostrar
+    // 1. Obtener mi ID
+    _myUserId = await AuthService.getUserId();
+
+    // 2. Determinar qué ID vamos a mostrar
     if (widget.userId != null) {
       _currentUserId = widget.userId;
     } else {
-      // Obtener mi ID desde el token (si implementaste guardar el ID)
-      // O por ahora, usaremos el email para buscar, o asumiremos que el backend te da el ID
-      // *Truco*: Si AuthService no nos da el UID, intentaremos buscar por email o decodificar mejor.
-      // Para este ejemplo, si es "Mi Perfil", cargaremos datos básicos del token.
-      final email = await AuthService.getUserEmail();
-      // Aquí idealmente deberías tener un método AuthService.getUserId()
+      // Si es mi perfil, usar mi ID
+      _currentUserId = _myUserId;
     }
 
     await _loadUserData();
@@ -71,19 +75,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
           }
         }
       } else {
-        // === MI PERFIL (Token + Firestore opcional) ===
-        // 1. Cargar lo básico del token
-        final name = await AuthService.getUserName();
-        final email = await AuthService.getUserEmail();
+        // === MI PERFIL (Firestore) ===
+        if (_currentUserId != null) {
+          final doc = await FirebaseFirestore.instance
+              .collection('Users')
+              .doc(_currentUserId)
+              .get();
 
-        // 2. Intentar buscar datos extra en Firestore si supiéramos mi UID
-        // Por simplificación ahora, usaremos los datos del token
-        if (mounted) {
-          setState(() {
-            _userName = name;
-            _userEmail = email;
-            _isLoading = false;
-          });
+          if (doc.exists) {
+            final data = doc.data()!;
+            if (mounted) {
+              setState(() {
+                _userName = data['usr_username'] as String?;
+                _userEmail = data['usr_email'] as String?;
+                _userBio = data['usr_bio'] as String?;
+                _photoUrl = data['usr_photoUrl'] as String?;
+                _isLoading = false;
+              });
+            }
+          } else {
+            // Fallback a datos del token
+            final name = await AuthService.getUserName();
+            final email = await AuthService.getUserEmail();
+            if (mounted) {
+              setState(() {
+                _userName = name;
+                _userEmail = email;
+                _isLoading = false;
+              });
+            }
+          }
+        } else {
+          // Fallback a datos del token
+          final name = await AuthService.getUserName();
+          final email = await AuthService.getUserEmail();
+          if (mounted) {
+            setState(() {
+              _userName = name;
+              _userEmail = email;
+              _isLoading = false;
+            });
+          }
         }
       }
     } catch (e) {
@@ -391,19 +423,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   const SizedBox(height: 20),
 
+                  // Botón de seguir/dejar de seguir (solo si no es mi perfil)
+                  if (_currentUserId != null && 
+                      _myUserId != null && 
+                      _currentUserId != _myUserId)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: FollowButton(
+                        targetUserId: _currentUserId!,
+                        width: 200,
+                        height: 36,
+                        fontSize: 15,
+                      ),
+                    ),
+
                   // ===========================
                   // ESTADÍSTICAS
                   // ===========================
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _StatItem(label: 'Posts', value: '12'),
-                      const SizedBox(width: 32),
-                      _StatItem(label: 'Seguidores', value: '158'),
-                      const SizedBox(width: 32),
-                      _StatItem(label: 'Siguiendo', value: '89'),
-                    ],
-                  ),
+                  if (_currentUserId != null)
+                    _StatsRow(userId: _currentUserId!)
+                  else
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _StatItem(label: 'Posts', value: '0'),
+                        SizedBox(width: 32),
+                        _StatItem(label: 'Seguidores', value: '0'),
+                        SizedBox(width: 32),
+                        _StatItem(label: 'Siguiendo', value: '0'),
+                      ],
+                    ),
 
                   const SizedBox(height: 8),
                 ],
@@ -502,16 +551,102 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
+// Widget para estadísticas reactivas y clickeables
+class _StatsRow extends StatelessWidget {
+  final String userId;
+
+  const _StatsRow({required this.userId});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // Posts
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('Posts')
+              .where('pos_authorUid', isEqualTo: userId)
+              .snapshots(),
+          builder: (context, snapshot) {
+            final postsCount = snapshot.data?.docs.length ?? 0;
+            return _StatItem(
+              label: 'Posts',
+              value: '$postsCount',
+              onTap: null, // Posts no es clickeable por ahora
+            );
+          },
+        ),
+        const SizedBox(width: 32),
+        // Seguidores (clickeable)
+        StreamBuilder<int>(
+          stream: SubscriptionService.getFollowersCountStream(userId),
+          builder: (context, snapshot) {
+            final followersCount = snapshot.data ?? 0;
+            return _StatItem(
+              label: 'Seguidores',
+              value: '$followersCount',
+              onTap: () => _showFollowersList(context, userId),
+            );
+          },
+        ),
+        const SizedBox(width: 32),
+        // Siguiendo (clickeable)
+        StreamBuilder<int>(
+          stream: SubscriptionService.getFollowingCountStream(userId),
+          builder: (context, snapshot) {
+            final followingCount = snapshot.data ?? 0;
+            return _StatItem(
+              label: 'Siguiendo',
+              value: '$followingCount',
+              onTap: () => _showFollowingList(context, userId),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  void _showFollowersList(BuildContext context, String userId) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _UsersListBottomSheet(
+        title: 'Seguidores',
+        stream: SubscriptionService.getFollowersStream(userId),
+      ),
+    );
+  }
+
+  void _showFollowingList(BuildContext context, String userId) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _UsersListBottomSheet(
+        title: 'Siguiendo',
+        stream: SubscriptionService.getFollowingStream(userId),
+      ),
+    );
+  }
+}
+
 // Widget pequeño para estadísticas
 class _StatItem extends StatelessWidget {
   final String label;
   final String value;
+  final VoidCallback? onTap;
 
-  const _StatItem({required this.label, required this.value});
+  const _StatItem({
+    required this.label,
+    required this.value,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    final widget = Column(
       children: [
         Text(
           value,
@@ -527,6 +662,103 @@ class _StatItem extends StatelessWidget {
           style: const TextStyle(color: Colors.white70, fontSize: 13),
         ),
       ],
+    );
+
+    if (onTap != null) {
+      return GestureDetector(
+        onTap: onTap,
+        child: widget,
+      );
+    }
+
+    return widget;
+  }
+}
+
+// Bottom sheet para mostrar lista de usuarios
+class _UsersListBottomSheet extends StatelessWidget {
+  final String title;
+  final Stream<List<UserModel>> stream;
+
+  const _UsersListBottomSheet({
+    required this.title,
+    required this.stream,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: BoxDecoration(
+        color: AppColors.upsBlueDark,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ),
+          const Divider(color: Colors.white24),
+          // Lista
+          Expanded(
+            child: StreamBuilder<List<UserModel>>(
+              stream: stream,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  );
+                }
+
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      'Error: ${snapshot.error}',
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                  );
+                }
+
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No hay usuarios',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  );
+                }
+
+                final users = snapshot.data!;
+
+                return ListView.builder(
+                  itemCount: users.length,
+                  itemBuilder: (context, index) {
+                    return UserListItem(user: users[index]);
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -12,6 +12,7 @@ import '../ui/screens/auth/register_screen.dart';
 import '../ui/screens/feed/feed_screen.dart';
 import '../ui/screens/post/new_post_screen.dart';
 import '../ui/screens/profile/profile_screen.dart';
+import '../ui/screens/search/search_screen.dart';
 
 // Middleware
 import '../services/auth/auth_middleware.dart';
@@ -62,6 +63,10 @@ final GoRouter appRouter = GoRouter(
         GoRoute(
           path: '/home/profile',
           builder: (context, state) => const ProfileScreen(),
+        ),
+        GoRoute(
+          path: '/home/search',
+          builder: (context, state) => const SearchScreen(),
         ),
         GoRoute(
           path: '/profile/:uid',

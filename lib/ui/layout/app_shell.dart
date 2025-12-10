@@ -12,8 +12,9 @@ class AppShell extends StatelessWidget {
 
   int _locationToIndex(String location) {
     if (location.startsWith('/home/feed')) return 0;
-    if (location.startsWith('/home/post/new')) return 1;
-    if (location.startsWith('/home/profile')) return 2;
+    if (location.startsWith('/home/search')) return 1;
+    if (location.startsWith('/home/post/new')) return 2;
+    if (location.startsWith('/home/profile')) return 3;
     return 0;
   }
 
@@ -46,9 +47,12 @@ class AppShell extends StatelessWidget {
                 context.go('/home/feed');
                 break;
               case 1:
-                context.go('/home/post/new');
+                context.go('/home/search');
                 break;
               case 2:
+                context.go('/home/post/new');
+                break;
+              case 3:
                 context.go('/home/profile');
                 break;
             }
