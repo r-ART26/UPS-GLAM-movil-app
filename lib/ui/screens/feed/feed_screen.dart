@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../theme/typography.dart';
+import '../../theme/colors.dart';
 import '../../widgets/effects/gradient_background.dart';
 import '../../../services/posts/feed_service.dart';
 import '../post/post_detail_screen.dart';
@@ -156,8 +157,7 @@ class FeedScreen extends StatelessWidget {
                     postId: docId,
                     imageUrl: imageUrl,
                     description: caption,
-                    authorName:
-                        'Usuario', // Se resolverá dentro si es necesario, o podemos pasar el UID
+                    authorUid: authorUid,
                   ),
                 ),
               );
@@ -316,47 +316,93 @@ class _UserNameFetcher extends StatelessWidget {
   Widget build(BuildContext context) {
     // Si no hay UID válido
     if (uid.isEmpty) {
-      return const Text(
-        'Usuario UPS',
-        style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w600,
-          fontSize: 15,
-        ),
+      return Row(
+        children: const [
+          CircleAvatar(
+            radius: 14,
+            backgroundColor: Colors.grey,
+            child: Icon(Icons.person, size: 16, color: Colors.white),
+          ),
+          SizedBox(width: 8),
+          Text(
+            'Usuario UPS',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+          ),
+        ],
       );
     }
 
     return FutureBuilder<DocumentSnapshot>(
       future: FirebaseFirestore.instance.collection('Users').doc(uid).get(),
       builder: (context, snapshot) {
-        // 1. Cargando o esperando
+        // 1. Cargando
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Container(
-            width: 80,
-            height: 14,
-            decoration: BoxDecoration(
-              color: Colors.white10,
-              borderRadius: BorderRadius.circular(4),
-            ),
+          return Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: const BoxDecoration(
+                  color: Colors.white10,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 80,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: Colors.white10,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ],
           );
         }
 
-        // 2. Extraer nombre
+        // 2. Extraer datos
         String name = 'Usuario UPS';
+        String? photoUrl;
+
         if (snapshot.hasData &&
             snapshot.data != null &&
             snapshot.data!.exists) {
           final data = snapshot.data!.data() as Map<String, dynamic>?;
           name = data?['usr_username'] as String? ?? 'Usuario UPS';
+          photoUrl = data?['usr_photoUrl'] as String?;
         }
 
-        return Text(
-          name,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-            fontSize: 15,
-          ),
+        return Row(
+          children: [
+            // Avatar
+            CircleAvatar(
+              radius: 14,
+              backgroundColor:
+                  AppColors.upsBlue, // Color de fondo si no hay foto
+              backgroundImage: (photoUrl != null && photoUrl.isNotEmpty)
+                  ? NetworkImage(photoUrl)
+                  : null,
+              child: (photoUrl == null || photoUrl.isEmpty)
+                  ? const Icon(Icons.person, size: 16, color: Colors.white)
+                  : null,
+            ),
+
+            const SizedBox(width: 8),
+
+            // Nombre
+            Text(
+              name,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ],
         );
       },
     );
