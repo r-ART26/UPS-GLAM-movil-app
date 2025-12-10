@@ -53,9 +53,16 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   Future<void> _scanForServers() async {
     if (_isScanning) return;
 
+    // Guardar el valor actual antes de limpiar
+    final currentSelectedIp = _selectedServerIp;
+    final currentText = _ipController.text.trim();
+
     setState(() {
       _isScanning = true;
       _discoveredServers = [];
+      // Limpiar la selección del dropdown temporalmente para evitar errores
+      // pero mantener el texto en el controlador
+      _selectedServerIp = null;
     });
 
     try {
@@ -66,24 +73,46 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       });
       
       if (mounted) {
-        final savedIp = _ipController.text.trim();
+        // Usar el texto actual o el que estaba guardado
+        final savedIp = _ipController.text.trim().isNotEmpty 
+            ? _ipController.text.trim() 
+            : currentText;
         
         setState(() {
           _discoveredServers = servers;
           _isScanning = false;
           
-          // Si la IP guardada está en la lista de servidores descubiertos, seleccionarla
-          if (savedIp.isNotEmpty && servers.contains(savedIp)) {
-            _selectedServerIp = savedIp;
-          } 
-          // Si hay servidores encontrados pero la IP guardada no está en la lista, seleccionar el primero
-          else if (servers.isNotEmpty && _selectedServerIp == null) {
-            _selectedServerIp = servers.first;
-            _ipController.text = servers.first;
+          // Si hay servidores encontrados, seleccionar automáticamente
+          if (servers.isNotEmpty) {
+            // Prioridad 1: Si la IP guardada/actual está en la lista, seleccionarla
+            if (savedIp.isNotEmpty && servers.contains(savedIp)) {
+              _selectedServerIp = savedIp;
+              _ipController.text = savedIp;
+              print('[WELCOME] Servidor seleccionado automáticamente (IP guardada): $savedIp');
+            } 
+            // Prioridad 2: Si la IP previamente seleccionada está en la lista, mantenerla
+            else if (currentSelectedIp != null && servers.contains(currentSelectedIp)) {
+              _selectedServerIp = currentSelectedIp;
+              _ipController.text = currentSelectedIp;
+              print('[WELCOME] Servidor seleccionado automáticamente (previamente seleccionado): $currentSelectedIp');
+            }
+            // Prioridad 3: Seleccionar el primer servidor encontrado
+            else {
+              _selectedServerIp = servers.first;
+              _ipController.text = servers.first;
+              print('[WELCOME] Servidor seleccionado automáticamente (primero encontrado): ${servers.first}');
+            }
           }
-          // Si no hay servidores o la IP guardada no está en la lista, usar modo manual
-          else if (savedIp.isNotEmpty && !servers.contains(savedIp)) {
-            _selectedServerIp = null; // Modo manual
+          // Si no hay servidores pero hay una IP guardada, mantenerla en modo manual
+          else if (savedIp.isNotEmpty) {
+            _selectedServerIp = null; // Modo manual, pero mantener el texto
+            _ipController.text = savedIp; // Asegurar que el texto se mantenga
+            print('[WELCOME] No se encontraron servidores, modo manual con IP: $savedIp');
+          }
+          // Si no hay servidores ni IP guardada, modo manual vacío
+          else {
+            _selectedServerIp = null;
+            print('[WELCOME] No se encontraron servidores, modo manual vacío');
           }
         });
       }
@@ -103,7 +132,14 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   /// Valida y guarda la IP del servidor.
   Future<void> _handleContinue() async {
-    final ip = _ipController.text.trim();
+    // Obtener IP del dropdown seleccionado o del campo de texto
+    String ip = _selectedServerIp ?? _ipController.text.trim();
+    
+    // Si hay una IP seleccionada en el dropdown, asegurarse de que el texto también la tenga
+    if (_selectedServerIp != null && _selectedServerIp!.isNotEmpty) {
+      _ipController.text = _selectedServerIp!;
+      ip = _selectedServerIp!;
+    }
 
     // Validar IP
     setState(() {
@@ -245,7 +281,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         ),
                         child: DropdownButtonFormField<String>(
                           value: _selectedServerIp != null && 
-                                 _discoveredServers.contains(_selectedServerIp)
+                                 (_discoveredServers.contains(_selectedServerIp) || 
+                                  _ipController.text.trim() == _selectedServerIp)
                                  ? _selectedServerIp
                                  : null,
                           decoration: InputDecoration(
@@ -380,11 +417,16 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                               ),
                             ),
                             onChanged: (value) {
-                              if (_ipError != null) {
-                                setState(() {
+                              setState(() {
+                                // Si el usuario escribe manualmente y el valor no coincide con el seleccionado,
+                                // cambiar a modo manual
+                                if (_selectedServerIp != null && value != _selectedServerIp) {
+                                  _selectedServerIp = null;
+                                }
+                                if (_ipError != null) {
                                   _ipError = null;
-                                });
-                              }
+                                }
+                              });
                             },
                           ),
                         ),
