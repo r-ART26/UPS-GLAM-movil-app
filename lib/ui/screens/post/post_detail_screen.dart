@@ -299,7 +299,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           padding: EdgeInsets.all(32.0),
                           child: Center(
                             child: Text(
-                              'Sé el primero en comentar 👇',
+                              'Sin comentarios',
                               style: TextStyle(color: Colors.white30),
                             ),
                           ),
