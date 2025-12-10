@@ -106,9 +106,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       final data = docs[index].data() as Map<String, dynamic>;
                       final authorUid = data['lik_authorUid'] as String? ?? '';
 
-                      return ListTile(
-                        // Quitamos el leading porque _UserNameFetcher ya trae avatar
-                        title: _UserNameFetcher(uid: authorUid),
+                      return InkWell(
+                        onTap: () =>
+                            GoRouter.of(context).push('/profile/$authorUid'),
+                        child: ListTile(
+                          // Quitamos el leading porque _UserNameFetcher ya trae avatar
+                          title: _UserNameFetcher(uid: authorUid),
+                        ),
                       );
                     },
                   );
@@ -275,7 +279,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                             // El Avatar ya viene dentro de _UserNameFetcher en el título
                             title: Padding(
                               padding: const EdgeInsets.only(bottom: 4),
-                              child: _UserNameFetcher(uid: authorUid),
+                              child: GestureDetector(
+                                onTap: () => GoRouter.of(
+                                  context,
+                                ).push('/profile/$authorUid'),
+                                child: _UserNameFetcher(uid: authorUid),
+                              ),
                             ),
                             subtitle: Text(
                               commentText,
