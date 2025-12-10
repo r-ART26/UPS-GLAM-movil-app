@@ -831,7 +831,6 @@ class _NewPostScreenState extends State<NewPostScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(30),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.white38),
             ),
@@ -844,6 +843,8 @@ class _NewPostScreenState extends State<NewPostScreen> {
                 hintText: 'Escribe algo sobre tu foto',
                 hintStyle: TextStyle(color: Colors.white54),
                 border: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                enabledBorder: InputBorder.none,
               ),
             ),
           ),
