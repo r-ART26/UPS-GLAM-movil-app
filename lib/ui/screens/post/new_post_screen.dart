@@ -26,6 +26,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
   final ImagePicker _imagePicker = ImagePicker();
   final TextEditingController _captionController = TextEditingController();
   final PageController _pageController = PageController();
+  final FocusNode _captionFocusNode = FocusNode();
 
   // Estado compartido entre páginas
   File? _originalImage;
@@ -36,6 +37,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
   bool _isProcessing = false;
   bool _isPublishing = false;
   int _currentStep = 0;
+  bool _isKeyboardVisible = false;
 
   // Definición de filtros disponibles
   final List<Map<String, dynamic>> _filters = [
@@ -49,6 +51,18 @@ class _NewPostScreenState extends State<NewPostScreen> {
     {'name': 'Collage', 'icon': Icons.grid_view, 'hasParams': false},
   ];
 
+  // Frases predeterminadas para descripción
+  final List<String> _suggestedCaptions = [
+    '¡Día increíble! ☀️',
+    'Momentos especiales 💫',
+    'Vida universitaria 📚',
+    'Comunidad UPS 🎓',
+    'Aventuras nuevas 🚀',
+    'Recuerdos para siempre 📸',
+    'Feliz y agradecido ❤️',
+    'Día perfecto ✨',
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -60,11 +74,19 @@ class _NewPostScreenState extends State<NewPostScreen> {
         }
       });
     });
+    
+    // Escuchar cambios en el foco del campo de texto
+    _captionFocusNode.addListener(() {
+      setState(() {
+        _isKeyboardVisible = _captionFocusNode.hasFocus;
+      });
+    });
   }
 
   @override
   void dispose() {
     _captionController.dispose();
+    _captionFocusNode.dispose();
     _pageController.dispose();
     super.dispose();
   }
@@ -798,13 +820,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
       padding: const EdgeInsets.all(24),
       child: Column(
         children: [
-          // Preview de la imagen final
-          Expanded(
-            flex: 2,
-            child: _buildLargeImagePreview(),
-          ),
-          
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           
           // Campo de descripción
           const Text(
@@ -821,6 +837,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
             ),
             child: TextField(
               controller: _captionController,
+              focusNode: _captionFocusNode,
               maxLines: 5,
               style: const TextStyle(color: Colors.white),
               decoration: const InputDecoration(
@@ -833,27 +850,78 @@ class _NewPostScreenState extends State<NewPostScreen> {
           
           const SizedBox(height: 24),
           
-          // Botones de navegación
-          Row(
-            children: [
-              Expanded(
-                child: PrimaryButton(
-                  label: 'Atrás',
-                  variant: ButtonVariant.ghost,
-                  onPressed: _previousStep,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: PrimaryButton(
-                  label: _isPublishing ? 'Publicando...' : 'Publicar',
-                  isLoading: _isPublishing,
-                  isDisabled: _isPublishing || _isProcessing,
-                  onPressed: _publishPost,
-                ),
-              ),
-            ],
+          // Frases predeterminadas
+          const Text(
+            'Sugerencias',
+            style: AppTypography.body,
           ),
+          const SizedBox(height: 12),
+          
+          // Grid de frases sugeridas
+          Expanded(
+            child: SingleChildScrollView(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _suggestedCaptions.map((caption) {
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _captionController.text = caption;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        caption,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+          
+          // Botones de navegación (ocultos cuando el teclado está visible)
+          if (!_isKeyboardVisible) ...[
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: PrimaryButton(
+                    label: 'Atrás',
+                    variant: ButtonVariant.ghost,
+                    onPressed: _previousStep,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: PrimaryButton(
+                    label: _isPublishing ? 'Publicando...' : 'Publicar',
+                    isLoading: _isPublishing,
+                    isDisabled: _isPublishing || _isProcessing,
+                    onPressed: _publishPost,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
