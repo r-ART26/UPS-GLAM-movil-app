@@ -423,7 +423,10 @@ class _NewPostScreenState extends State<NewPostScreen> {
       // Ir a página de parámetros
       _goToStep(2);
     } else {
-      // Aplicar filtro directamente y volver a página de filtros
+      // Aplicar filtro directamente (incluye "Original")
+      setState(() {
+        _selectedFilter = filterName;
+      });
       _applyFilter(filterName);
     }
   }
