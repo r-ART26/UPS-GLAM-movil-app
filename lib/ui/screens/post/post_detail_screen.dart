@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme/colors.dart';
+import '../../../services/auth/auth_service.dart';
 import '../../widgets/dialogs/confirm_dialog.dart';
 import '../../widgets/like_button.dart';
 import '../../../services/posts/comment_service.dart';
@@ -27,13 +28,32 @@ class PostDetailScreen extends StatefulWidget {
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
   final TextEditingController _commentController = TextEditingController();
-  String? _currentUserId;
+  String _currentUserName =
+      'Usuario'; // Nombre por defecto para el avatar propio
+
   bool _isPostingComment = false;
+  bool _isComposing = false; // Estado para saber si hay texto
+  String? _currentUserId;
 
   @override
   void initState() {
     super.initState();
+    _loadCurrentUser();
     _loadCurrentUserId();
+    _commentController.addListener(() {
+      setState(() {
+        _isComposing = _commentController.text.trim().isNotEmpty;
+      });
+    });
+  }
+
+  Future<void> _loadCurrentUser() async {
+    final name = await AuthService.getUserName();
+    if (name != null && mounted) {
+      setState(() {
+        _currentUserName = name;
+      });
+    }
   }
 
   Future<void> _loadCurrentUserId() async {
@@ -152,6 +172,123 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     );
   }
 
+  Future<void> _handlePostComment() async {
+    final text = _commentController.text.trim();
+    if (text.isEmpty || _currentUserId == null) return;
+
+    setState(() {
+      _isPostingComment = true;
+    });
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('Posts')
+          .doc(widget.postId)
+          .collection('Comments')
+          .add({
+            'com_text': text,
+            'com_authorUid': _currentUserId,
+            'com_timestamp': FieldValue.serverTimestamp(),
+          });
+
+      _commentController.clear();
+      if (mounted) FocusScope.of(context).unfocus();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error al publicar: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPostingComment = false;
+          _isComposing = false;
+        });
+      }
+    }
+  }
+
+  void _showCommentInput(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: AppColors.upsBlue,
+                  backgroundImage: NetworkImage(
+                    'https://ui-avatars.com/api/?name=${Uri.encodeComponent(_currentUserName)}&background=003F87&color=fff&size=150&bold=true',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _commentController,
+                    autofocus: true,
+                    minLines: 1,
+                    maxLines: 4,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      hintText: 'Escribe tu comentario...',
+                      hintStyle: TextStyle(color: Colors.white38),
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
+                ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _commentController,
+                  builder: (context, value, child) {
+                    final hasText = value.text.trim().isNotEmpty;
+                    return TextButton(
+                      onPressed: (hasText && !_isPostingComment)
+                          ? () async {
+                              await _handlePostComment();
+                              if (context.mounted) Navigator.pop(context);
+                            }
+                          : null,
+                      child: _isPostingComment
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.upsYellow,
+                              ),
+                            )
+                          : Text(
+                              'Publicar',
+                              style: TextStyle(
+                                color: hasText
+                                    ? AppColors.upsYellow
+                                    : Colors.white24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -160,6 +297,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         backgroundColor: Colors.black,
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text('Comentarios', style: TextStyle(color: Colors.white)),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showCommentInput(context),
+        backgroundColor: AppColors.upsYellow,
+        child: const Icon(Icons.chat_bubble_outline, color: Colors.black),
       ),
       body: Column(
         children: [
@@ -230,13 +372,17 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                     .snapshots(),
                                 builder: (context, postSnapshot) {
                                   int likesCount = 0;
-                                  if (postSnapshot.hasData && postSnapshot.data != null) {
-                                    final data = postSnapshot.data!.data() as Map<String, dynamic>?;
+                                  if (postSnapshot.hasData &&
+                                      postSnapshot.data != null) {
+                                    final data =
+                                        postSnapshot.data!.data()
+                                            as Map<String, dynamic>?;
                                     if (data != null) {
-                                      likesCount = data['pos_likesCount'] as int? ?? 0;
+                                      likesCount =
+                                          data['pos_likesCount'] as int? ?? 0;
                                     }
                                   }
-                                  
+
                                   return Text(
                                     '$likesCount Me gusta',
                                     style: const TextStyle(
@@ -319,8 +465,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           final authorUid =
                               data['com_authorUid'] as String? ?? '';
                           final commentId = docs[index].id;
-                          final isOwner = _currentUserId != null && 
-                                        _currentUserId == authorUid;
+                          final isOwner =
+                              _currentUserId != null &&
+                              _currentUserId == authorUid;
 
                           return ListTile(
                             contentPadding: const EdgeInsets.symmetric(
@@ -331,7 +478,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                             title: Padding(
                               padding: const EdgeInsets.only(bottom: 4),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Expanded(
                                     child: GestureDetector(
@@ -351,14 +499,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                       ),
                                       onPressed: () async {
                                         final confirmed = await ConfirmDialog.show(
-                                        context,
-                                        title: 'Eliminar comentario',
-                                        message: '¿Estás seguro de que deseas eliminar este comentario?',
-                                        confirmText: 'Eliminar',
-                                        cancelText: 'Cancelar',
-                                        confirmColor: Colors.redAccent,
-                                      );
-                                        
+                                          context,
+                                          title: 'Eliminar comentario',
+                                          message:
+                                              '¿Estás seguro de que deseas eliminar este comentario?',
+                                          confirmText: 'Eliminar',
+                                          cancelText: 'Cancelar',
+                                          confirmColor: Colors.redAccent,
+                                        );
+
                                         if (confirmed == true) {
                                           await CommentService.deleteComment(
                                             widget.postId,
@@ -386,78 +535,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
                   // Espacio extra para que el teclado no tape el último comentario
                   const SizedBox(height: 80),
-                ],
-              ),
-            ),
-          ),
-
-          // 2. Input para Escribir (Fijo abajo)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: const BoxDecoration(
-              color: Color(0xFF1E1E1E),
-              border: Border(top: BorderSide(color: Colors.white12)),
-            ),
-            child: SafeArea(
-              // Para respetar el área del iPhone X+
-              child: Row(
-                children: [
-                  const CircleAvatar(
-                    radius: 16,
-                    backgroundColor: Colors.grey,
-                    child: Icon(Icons.person, size: 20, color: Colors.white),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      controller: _commentController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        hintText: 'Agrega un comentario...',
-                        hintStyle: TextStyle(color: Colors.white38),
-                        border: InputBorder.none,
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _isPostingComment ? null : () async {
-                      final text = _commentController.text.trim();
-                      if (text.isEmpty) return;
-                      
-                      setState(() {
-                        _isPostingComment = true;
-                      });
-                      
-                      final success = await CommentService.createComment(
-                        widget.postId,
-                        text,
-                        context,
-                      );
-                      
-                      if (mounted) {
-                        setState(() {
-                          _isPostingComment = false;
-                        });
-                        
-                        if (success) {
-                          _commentController.clear();
-                        }
-                      }
-                    },
-                    child: _isPostingComment
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.upsYellow),
-                            ),
-                          )
-                        : const Text(
-                            'Publicar',
-                            style: TextStyle(color: AppColors.upsYellow),
-                          ),
-                  ),
                 ],
               ),
             ),
