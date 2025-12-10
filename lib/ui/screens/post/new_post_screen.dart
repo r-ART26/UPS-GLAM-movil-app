@@ -10,6 +10,7 @@ import '../../widgets/effects/gradient_background.dart';
 import '../../widgets/buttons/primary_button.dart';
 import '../../widgets/filters/filter_item.dart';
 import '../../widgets/filters/filter_params_panel.dart';
+import '../../widgets/dialogs/error_dialog.dart';
 import '../../../services/image/temp_image_service.dart';
 import '../../../services/image/image_processing_service.dart';
 import '../../../services/posts/post_service.dart';
@@ -33,7 +34,6 @@ class _NewPostScreenState extends State<NewPostScreen> {
   bool _isProcessing = false;
   bool _isPublishing = false;
   bool _showParamsPanel = false;
-  String? _errorMessage;
 
   // Definición de filtros disponibles
   final List<Map<String, dynamic>> _filters = [
@@ -111,14 +111,25 @@ class _NewPostScreenState extends State<NewPostScreen> {
             _processedImage = null;
             _currentFilter = null;
             _showParamsPanel = false;
-            _errorMessage = null;
           });
         } else {
-          _showError('Error al guardar la imagen');
+          if (mounted) {
+            await ErrorDialog.show(
+              context,
+              title: 'Error',
+              message: 'Error al guardar la imagen. Por favor, intenta nuevamente.',
+            );
+          }
         }
       }
     } catch (e) {
-      _showError('Error al seleccionar imagen: $e');
+      if (mounted) {
+        await ErrorDialog.show(
+          context,
+          title: 'Error al seleccionar imagen',
+          message: 'Ocurrió un error al seleccionar la imagen: ${e.toString()}',
+        );
+      }
     }
   }
 
@@ -146,7 +157,6 @@ class _NewPostScreenState extends State<NewPostScreen> {
 
     setState(() {
       _isProcessing = true;
-      _errorMessage = null;
     });
 
     try {
@@ -226,7 +236,11 @@ class _NewPostScreenState extends State<NewPostScreen> {
         setState(() {
           _isProcessing = false;
         });
-        _showError('Error al aplicar filtro: $e');
+        await ErrorDialog.show(
+          context,
+          title: 'Error al aplicar filtro',
+          message: 'Ocurrió un error al aplicar el filtro: ${e.toString()}',
+        );
       }
     }
   }
@@ -300,19 +314,30 @@ class _NewPostScreenState extends State<NewPostScreen> {
   /// Publica el post
   Future<void> _publishPost() async {
     if (_originalImage == null) {
-      _showError('Selecciona una imagen primero');
+      if (mounted) {
+        await ErrorDialog.show(
+          context,
+          title: 'Imagen requerida',
+          message: 'Por favor, selecciona una imagen antes de publicar.',
+        );
+      }
       return;
     }
 
     final caption = _captionController.text.trim();
     if (caption.isEmpty) {
-      _showError('Escribe una descripción');
+      if (mounted) {
+        await ErrorDialog.show(
+          context,
+          title: 'Descripción requerida',
+          message: 'Por favor, escribe una descripción para tu publicación.',
+        );
+      }
       return;
     }
 
     setState(() {
       _isPublishing = true;
-      _errorMessage = null;
     });
 
     try {
@@ -350,23 +375,13 @@ class _NewPostScreenState extends State<NewPostScreen> {
         setState(() {
           _isPublishing = false;
         });
-        _showError('Error al publicar: $e');
+        await ErrorDialog.show(
+          context,
+          title: 'Error al publicar',
+          message: 'Ocurrió un error al intentar publicar tu post: ${e.toString()}',
+        );
       }
     }
-  }
-
-  /// Muestra un mensaje de error
-  void _showError(String message) {
-    setState(() {
-      _errorMessage = message;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.redAccent,
-        duration: const Duration(seconds: 3),
-      ),
-    );
   }
 
   @override
@@ -483,34 +498,6 @@ class _NewPostScreenState extends State<NewPostScreen> {
                                       onAuto: () {
                                         _applyFilterAuto(_currentFilter!);
                                       },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                            ],
-
-                            // MENSAJE DE ERROR
-                            if (_errorMessage != null) ...[
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.redAccent.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.error_outline, color: Colors.redAccent, size: 20),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        _errorMessage!,
-                                        style: const TextStyle(
-                                          color: Colors.redAccent,
-                                          fontSize: 13,
-                                        ),
-                                      ),
                                     ),
                                   ],
                                 ),

@@ -32,6 +32,10 @@ class BottomNavBar extends StatelessWidget {
           label: 'Inicio',
         ),
         BottomNavigationBarItem(
+          icon: Icon(Icons.search),
+          label: 'Buscar',
+        ),
+        BottomNavigationBarItem(
           icon: Icon(Icons.add_box_outlined),
           label: 'Nuevo',
         ),

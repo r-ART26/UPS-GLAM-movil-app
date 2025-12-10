@@ -151,5 +151,25 @@ class AuthService {
       return null;
     }
   }
+
+  /// Obtiene el UID del usuario desde el token JWT.
+  /// Retorna null si no se puede obtener.
+  /// Busca en los campos: 'sub', 'uid', 'user_id' (en ese orden)
+  static Future<String?> getUserId() async {
+    try {
+      final token = await getToken();
+      if (token == null) return null;
+      
+      final payload = getTokenPayload(token);
+      if (payload == null) return null;
+      
+      // Intentar obtener el UID de diferentes campos posibles
+      return payload['sub'] as String? ?? 
+             payload['uid'] as String? ?? 
+             payload['user_id'] as String?;
+    } catch (e) {
+      return null;
+    }
+  }
 }
 
