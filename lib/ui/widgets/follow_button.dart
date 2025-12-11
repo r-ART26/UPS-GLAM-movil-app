@@ -118,7 +118,7 @@ class _FollowButtonState extends State<FollowButton> {
           child: OutlinedButton(
             onPressed: _isToggling ? null : _handleToggle,
             style: OutlinedButton.styleFrom(
-              foregroundColor: isFollowing ? Colors.white : AppColors.upsYellow,
+              foregroundColor: isFollowing ? AppColors.upsBlue : AppColors.upsYellow,
               backgroundColor: isFollowing ? AppColors.upsYellow : Colors.transparent,
               side: BorderSide(
                 color: isFollowing ? AppColors.upsYellow : AppColors.upsYellow,
@@ -136,7 +136,7 @@ class _FollowButtonState extends State<FollowButton> {
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        isFollowing ? Colors.white : AppColors.upsYellow,
+                        isFollowing ? AppColors.upsBlue : AppColors.upsYellow,
                       ),
                     ),
                   )
