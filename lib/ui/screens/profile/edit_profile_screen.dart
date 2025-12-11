@@ -1,7 +1,9 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../theme/colors.dart';
+import '../../theme/typography.dart';
 import '../../../services/users/user_profile_service.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -59,8 +61,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     try {
       await UserProfileService.updateProfile(
-        name: widget
-            .currentName, // Pasamos el original sin cambios solo por cumplir con la firma si fuera necesario
+        name: widget.currentName, // Pasamos el original sin cambios
         bio: _bioController.text.trim(),
         imageFile: _selectedImage,
       );
@@ -91,19 +92,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black, // Fondo oscuro
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: Colors.black,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text(
-          'Editar Perfil',
-          style: TextStyle(color: Colors.white),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
           if (_isSaving)
             const Center(
               child: Padding(
-                padding: EdgeInsets.only(right: 16.0),
+                padding: EdgeInsets.only(right: 20.0),
                 child: SizedBox(
                   width: 20,
                   height: 20,
@@ -115,79 +116,168 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             )
           else
-            IconButton(
-              icon: const Icon(Icons.check, color: AppColors.upsYellow),
+            TextButton(
               onPressed: _saveProfile,
-              tooltip: 'Guardar',
+              child: const Text(
+                'Guardar',
+                style: TextStyle(
+                  color: AppColors.upsYellow,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
             ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            // ==================
-            // SECCIÓN DE AVATAR
-            // ==================
-            Center(
-              child: Stack(
+      body: Stack(
+        children: [
+          // 1. Fondo Base (Gradiente Oscuro)
+          Container(
+            decoration: const BoxDecoration(
+              gradient: AppGradients.darkBackground,
+            ),
+          ),
+
+          // 2. Efecto Vidrio Global (Sutil)
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              child: Container(color: Colors.black.withOpacity(0.3)),
+            ),
+          ),
+
+          // 3. Contenido Central
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  // --- AVATAR EDITABLE ---
                   GestureDetector(
                     onTap: _pickImage,
-                    child: CircleAvatar(
-                      radius: 60,
-                      backgroundColor: Colors.grey[800],
-                      backgroundImage: _getAvatarImage(),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Círculo de brillo exterior
+                        Container(
+                          width: 180,
+                          height: 180,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.upsBlue.withOpacity(0.4),
+                                blurRadius: 40,
+                                spreadRadius: 10,
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Avatar
+                        Container(
+                          width: 160,
+                          height: 160,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.2),
+                              width: 4,
+                            ),
+                          ),
+                          child: CircleAvatar(
+                            radius: 80,
+                            backgroundColor: AppColors.cardBackground,
+                            backgroundImage: _getAvatarImage(),
+                          ),
+                        ),
+                        // Overlay de "Editar"
+                        Container(
+                          width: 160,
+                          height: 160,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.black.withOpacity(0.3),
+                          ),
+                          child: const Icon(
+                            Icons.camera_alt_outlined,
+                            color: Colors.white70,
+                            size: 40,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: GestureDetector(
-                      onTap: _pickImage,
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.upsBlue,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.black, width: 2),
+
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Toca para cambiar foto',
+                    style: TextStyle(color: Colors.white54, fontSize: 14),
+                  ),
+
+                  const SizedBox(height: 48),
+
+                  // --- ESTADO (BIO) EDITABLE ---
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: AppColors.glassWhite,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: AppColors.glassBorder),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
                         ),
-                        child: const Icon(
-                          Icons.camera_alt,
-                          color: Colors.white,
-                          size: 20,
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'ESTADO',
+                          style: TextStyle(
+                            color: AppColors.upsYellow, // Resaltar título
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 2,
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _bioController,
+                          maxLength: 60,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            height: 1.5,
+                          ),
+                          decoration: const InputDecoration(
+                            hintText: 'Escribe algo sobre ti...',
+                            hintStyle: TextStyle(color: Colors.white24),
+                            border: InputBorder.none,
+                            counterText:
+                                '', // Ocultar contador por limpieza visual
+                          ),
+                        ),
+                        const Divider(color: Colors.white10, height: 30),
+                        Text(
+                          '${_bioController.text.length} / 60',
+                          style: const TextStyle(
+                            color: Colors.white30,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: _pickImage,
-              child: const Text(
-                'Cambiar foto de perfil',
-                style: TextStyle(color: AppColors.upsBlue, fontSize: 16),
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // ==================
-            // FORMULARIO
-            // ==================
-
-            // Campo Estado (Bio)
-            _buildTextField(
-              controller: _bioController,
-              label: 'Estado',
-              icon: Icons.chat_bubble_outline,
-              maxLength: 60, // Corto para el estilo "Note"
-              helperText: 'Este mensaje aparecerá junto a tu foto de perfil.',
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -202,60 +292,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     // Fallback UI Avatar
     return NetworkImage(
       'https://ui-avatars.com/api/?name=${Uri.encodeComponent(widget.currentName)}&background=333&color=fff',
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    int? maxLength,
-    String? helperText,
-    bool readOnly = false, // Parámetro opcional
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label.toUpperCase(),
-          style: const TextStyle(
-            color: Colors.white54,
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.0,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          maxLength: maxLength,
-          readOnly: readOnly, // Aplicamos readOnly
-          style: TextStyle(
-            color: readOnly
-                ? Colors.white38
-                : Colors.white, // Color gris si está bloqueado
-            fontSize: 16,
-          ),
-          decoration: InputDecoration(
-            helperText: helperText,
-            helperStyle: const TextStyle(color: Colors.white24),
-            prefixIcon: Icon(icon, color: Colors.white70),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.white24),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: readOnly ? Colors.white24 : AppColors.upsBlue,
-              ), // Borde gris si bloqueado
-            ),
-            fillColor: Colors.white.withOpacity(0.05),
-            filled: true,
-            counterStyle: const TextStyle(color: Colors.white24),
-          ),
-        ),
-      ],
     );
   }
 }
