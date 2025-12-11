@@ -37,6 +37,7 @@ class AppShell extends StatelessWidget {
         }
       },
       child: Scaffold(
+        extendBody: true,
         body: child,
 
         bottomNavigationBar: BottomNavBar(
