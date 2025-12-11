@@ -1,13 +1,14 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme/colors.dart';
-import '../../../services/auth/auth_service.dart';
+import '../../theme/typography.dart';
 import '../../widgets/dialogs/confirm_dialog.dart';
 import '../../widgets/like_button.dart';
 import '../../../services/posts/comment_service.dart';
-import '../../../services/auth/auth_service.dart';
 import '../../widgets/full_screen_image_viewer.dart';
+import 'post_detail_controller.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final String postId;
@@ -28,72 +29,25 @@ class PostDetailScreen extends StatefulWidget {
 }
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
-  final TextEditingController _commentController = TextEditingController();
-  String _currentUserName = 'Usuario';
-  String? _currentUserPhotoUrl; // Foto del usuario actual
-
-  bool _isPostingComment = false;
-  bool _isComposing = false;
-  String? _currentUserId;
+  late final PostDetailController _controller;
 
   @override
   void initState() {
     super.initState();
-    _loadCurrentUser();
-    // _loadCurrentUserId ya no es estrictamente necesario si hacemos todo en _loadCurrentUser,
-    // pero lo dejamos para no romper nada que dependa de _currentUserId pronto.
-    _commentController.addListener(() {
-      setState(() {
-        _isComposing = _commentController.text.trim().isNotEmpty;
-      });
-    });
-  }
-
-  Future<void> _loadCurrentUser() async {
-    final uid = await AuthService.getUserId();
-    if (uid != null) {
-      if (mounted) setState(() => _currentUserId = uid);
-
-      try {
-        // Obtener datos frescos de Firestore para tener la foto más reciente
-        final doc = await FirebaseFirestore.instance
-            .collection('Users')
-            .doc(uid)
-            .get();
-        if (doc.exists && mounted) {
-          final data = doc.data()!;
-          setState(() {
-            _currentUserName = data['usr_username'] as String? ?? 'Usuario';
-            _currentUserPhotoUrl = data['usr_photoUrl'] as String?;
-          });
-        }
-      } catch (e) {
-        debugPrint('Error cargando usuario actual: $e');
-      }
-    }
+    _controller = PostDetailController(postId: widget.postId);
   }
 
   @override
   void dispose() {
-    _commentController.dispose();
+    _controller.dispose();
     super.dispose();
-  }
-
-  // Referencia a Firestore para leer comentarios
-  Stream<QuerySnapshot> get _commentsStream {
-    return FirebaseFirestore.instance
-        .collection('Posts')
-        .doc(widget.postId)
-        .collection('Comments')
-        .orderBy('com_timestamp', descending: true)
-        .snapshots();
   }
 
   /// Muestra el modal con la lista de usuarios que dieron like
   void _showLikesModal(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1E1E1E), // Fondo oscuro
+      backgroundColor: AppColors.darkBackground,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -107,27 +61,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 border: Border(bottom: BorderSide(color: Colors.white12)),
               ),
               child: const Center(
-                child: Text(
-                  'Me gusta',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
+                child: Text('Me gusta', style: AppTypography.h3),
               ),
             ),
 
             // Lista de Likes
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('Posts')
-                    .doc(widget.postId)
-                    .collection('Likes')
-                    // Ordenamos por fecha si existe, sino por defecto
-                    .orderBy('lik_timestamp', descending: true)
-                    .snapshots(),
+                stream: _controller.likesStream,
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
                     return const Center(
@@ -180,99 +121,70 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     );
   }
 
-  Future<void> _handlePostComment() async {
-    final text = _commentController.text.trim();
-    if (text.isEmpty || _currentUserId == null) return;
-
-    setState(() {
-      _isPostingComment = true;
-    });
-
-    try {
-      await FirebaseFirestore.instance
-          .collection('Posts')
-          .doc(widget.postId)
-          .collection('Comments')
-          .add({
-            'com_text': text,
-            'com_authorUid': _currentUserId,
-            'com_timestamp': FieldValue.serverTimestamp(),
-          });
-
-      _commentController.clear();
-      if (mounted) FocusScope.of(context).unfocus();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error al publicar: $e')));
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isPostingComment = false;
-          _isComposing = false;
-        });
-      }
-    }
-  }
-
   void _showCommentInput(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF1E1E1E),
+      backgroundColor: AppColors.darkBackground,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: AppColors.upsBlue,
-                  backgroundImage:
-                      (_currentUserPhotoUrl != null &&
-                          _currentUserPhotoUrl!.isNotEmpty)
-                      ? NetworkImage(_currentUserPhotoUrl!)
-                      : NetworkImage(
-                          'https://ui-avatars.com/api/?name=${Uri.encodeComponent(_currentUserName)}&background=003F87&color=fff&size=150&bold=true',
-                        ),
+        return ListenableBuilder(
+          listenable: _controller,
+          builder: (context, _) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _commentController,
-                    autofocus: true,
-                    minLines: 1,
-                    maxLines: 4,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
-                      hintText: 'Escribe tu comentario...',
-                      hintStyle: TextStyle(color: Colors.white38),
-                      border: InputBorder.none,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor: AppColors.upsBlue,
+                      backgroundImage:
+                          (_controller.currentUserPhotoUrl != null &&
+                              _controller.currentUserPhotoUrl!.isNotEmpty)
+                          ? NetworkImage(_controller.currentUserPhotoUrl!)
+                          : NetworkImage(
+                              'https://ui-avatars.com/api/?name=${Uri.encodeComponent(_controller.currentUserName)}&background=003F87&color=fff&size=150&bold=true',
+                            ),
                     ),
-                  ),
-                ),
-                ValueListenableBuilder<TextEditingValue>(
-                  valueListenable: _commentController,
-                  builder: (context, value, child) {
-                    final hasText = value.text.trim().isNotEmpty;
-                    return TextButton(
-                      onPressed: (hasText && !_isPostingComment)
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: _controller.commentController,
+                        autofocus: true,
+                        minLines: 1,
+                        maxLines: 4,
+                        style: AppTypography.body.copyWith(color: Colors.white),
+                        decoration: InputDecoration(
+                          hintText: 'Escribe tu comentario...',
+                          hintStyle: AppTypography.bodySmall,
+                          border: InputBorder.none,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed:
+                          (_controller.isComposing &&
+                              !_controller.isPostingComment)
                           ? () async {
-                              await _handlePostComment();
-                              if (context.mounted) Navigator.pop(context);
+                              final success = await _controller.postComment(
+                                context,
+                              );
+                              if (success && context.mounted) {
+                                Navigator.pop(context);
+                              }
                             }
                           : null,
-                      child: _isPostingComment
+                      child: _controller.isPostingComment
                           ? const SizedBox(
                               width: 16,
                               height: 16,
@@ -284,18 +196,18 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           : Text(
                               'Publicar',
                               style: TextStyle(
-                                color: hasText
+                                color: _controller.isComposing
                                     ? AppColors.upsYellow
                                     : Colors.white24,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                    );
-                  },
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
@@ -304,268 +216,285 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black, // Fondo oscuro estilo inmersivo
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        flexibleSpace: ClipRRect(
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10), // Glass effect
+            child: Container(color: Colors.black.withOpacity(0.2)),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text('Comentarios', style: TextStyle(color: Colors.white)),
+        title: const Text('Comentarios', style: AppTypography.h3),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showCommentInput(context),
         backgroundColor: AppColors.upsYellow,
         child: const Icon(Icons.chat_bubble_outline, color: Colors.black),
       ),
-      body: Column(
-        children: [
-          // 1. Contenido del Post (Scrollable)
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Imagen Hero (Animación suave desde el feed)
-                  // Imagen Hero (con Zoom)
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => FullScreenImageViewer(
-                            imageUrl: widget.imageUrl,
-                            heroTag: widget.postId,
+      body: Container(
+        decoration: const BoxDecoration(gradient: AppGradients.darkBackground),
+        child: Column(
+          children: [
+            // 1. Contenido del Post (Scrollable)
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Imagen Hero (Animación suave desde el feed)
+                    // Imagen Hero (con Zoom)
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => FullScreenImageViewer(
+                              imageUrl: widget.imageUrl,
+                              heroTag: widget.postId,
+                            ),
                           ),
+                        );
+                      },
+                      child: Hero(
+                        tag: widget.postId,
+                        child: Image.network(
+                          widget.imageUrl,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
                         ),
-                      );
-                    },
-                    child: Hero(
-                      tag: widget.postId,
-                      child: Image.network(
-                        widget.imageUrl,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
                       ),
                     ),
-                  ),
 
-                  // Descripción Original
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: const BoxDecoration(
-                      border: Border(bottom: BorderSide(color: Colors.white12)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Nombre Autor (Clicable)
-                        GestureDetector(
-                          onTap: () {
-                            GoRouter.of(
-                              context,
-                            ).push('/profile/${widget.authorUid}');
-                          },
-                          child: _UserNameFetcher(uid: widget.authorUid),
+                    // Descripción Original
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                      decoration: const BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(color: Colors.white12),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.description,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Nombre Autor (Clicable)
+                          GestureDetector(
+                            onTap: () {
+                              GoRouter.of(
+                                context,
+                              ).push('/profile/${widget.authorUid}');
+                            },
+                            child: _UserNameFetcher(uid: widget.authorUid),
                           ),
-                        ),
-                        const SizedBox(height: 12),
+                          const SizedBox(height: 4),
+                          Text(widget.description, style: AppTypography.body),
+                          const SizedBox(height: 12),
 
-                        // Botón para dar like y ver Likes
-                        Row(
-                          children: [
-                            // Botón de like con animación
-                            LikeButton(
-                              postId: widget.postId,
-                              initialLikesCount: 0,
-                              iconSize: 20,
-                              likedColor: Colors.redAccent,
-                              unlikedColor: Colors.white54,
-                              showCount: false,
-                            ),
-                            const SizedBox(width: 8),
-                            // Contador de likes y botón para ver lista
-                            GestureDetector(
-                              onTap: () => _showLikesModal(context),
-                              child: StreamBuilder<DocumentSnapshot>(
-                                stream: FirebaseFirestore.instance
-                                    .collection('Posts')
-                                    .doc(widget.postId)
-                                    .snapshots(),
-                                builder: (context, postSnapshot) {
-                                  int likesCount = 0;
-                                  if (postSnapshot.hasData &&
-                                      postSnapshot.data != null) {
-                                    final data =
-                                        postSnapshot.data!.data()
-                                            as Map<String, dynamic>?;
-                                    if (data != null) {
-                                      likesCount =
-                                          data['pos_likesCount'] as int? ?? 0;
+                          // Botón para dar like y ver Likes
+                          Row(
+                            children: [
+                              // Botón de like con animación
+                              LikeButton(
+                                postId: widget.postId,
+                                initialLikesCount: 0,
+                                iconSize: 20,
+                                likedColor: AppColors.upsYellow,
+                                unlikedColor: Colors.white54,
+                                showCount: false,
+                              ),
+                              const SizedBox(width: 8),
+                              // Contador de likes y botón para ver lista
+                              GestureDetector(
+                                onTap: () => _showLikesModal(context),
+                                child: StreamBuilder<DocumentSnapshot>(
+                                  stream: _controller.postStream,
+                                  builder: (context, postSnapshot) {
+                                    int likesCount = 0;
+                                    if (postSnapshot.hasData &&
+                                        postSnapshot.data != null) {
+                                      final data =
+                                          postSnapshot.data!.data()
+                                              as Map<String, dynamic>?;
+                                      if (data != null) {
+                                        likesCount =
+                                            data['pos_likesCount'] as int? ?? 0;
+                                      }
                                     }
-                                  }
 
-                                  return Text(
-                                    '$likesCount Me gusta',
-                                    style: const TextStyle(
-                                      color: Colors.white54,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  );
-                                },
+                                    return Text(
+                                      '$likesCount Me gusta',
+                                      style: AppTypography.caption.copyWith(
+                                        color: Colors.white54,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    );
+                                  },
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Sección de Comentarios (Título)
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    child: Text(
-                      'Comentarios',
-                      style: TextStyle(
-                        color: Colors.white54,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                  ),
 
-                  // Lista de Comentarios en Tiempo Real
-                  StreamBuilder<QuerySnapshot>(
-                    stream: _commentsStream,
-                    builder: (context, snapshot) {
-                      if (snapshot.hasError) {
-                        return const Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: Text(
-                            'Error cargando comentarios',
-                            style: TextStyle(color: Colors.red),
-                          ),
-                        );
-                      }
+                    // Sección de Comentarios (Título)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                      child: Text(
+                        'Comentarios',
+                        style: AppTypography.h3.copyWith(fontSize: 16),
+                      ),
+                    ),
 
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(20.0),
-                            child: CircularProgressIndicator(
-                              color: Colors.white24,
-                            ),
-                          ),
-                        );
-                      }
-
-                      final docs = snapshot.data?.docs ?? [];
-
-                      if (docs.isEmpty) {
-                        return const Padding(
-                          padding: EdgeInsets.all(32.0),
-                          child: Center(
+                    // Lista de Comentarios en Tiempo Real
+                    StreamBuilder<QuerySnapshot>(
+                      stream: _controller.commentsStream,
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return const Padding(
+                            padding: EdgeInsets.all(16.0),
                             child: Text(
-                              'Sin comentarios',
-                              style: TextStyle(color: Colors.white30),
+                              'Error cargando comentarios',
+                              style: TextStyle(color: Colors.red),
                             ),
-                          ),
-                        );
-                      }
+                          );
+                        }
 
-                      return ListView.builder(
-                        shrinkWrap:
-                            true, // Importante dentro de SingleChildScrollView
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: docs.length,
-                        itemBuilder: (context, index) {
-                          final data =
-                              docs[index].data() as Map<String, dynamic>;
-                          final commentText = data['com_text'] as String? ?? '';
-                          // Usamos el UID del autor del comentario
-                          final authorUid =
-                              data['com_authorUid'] as String? ?? '';
-                          final commentId = docs[index].id;
-                          final isOwner =
-                              _currentUserId != null &&
-                              _currentUserId == authorUid;
-
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 4,
-                            ),
-                            // El Avatar ya viene dentro de _UserNameFetcher en el título
-                            title: Padding(
-                              padding: const EdgeInsets.only(bottom: 4),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: GestureDetector(
-                                      onTap: () => GoRouter.of(
-                                        context,
-                                      ).push('/profile/$authorUid'),
-                                      child: _UserNameFetcher(uid: authorUid),
-                                    ),
-                                  ),
-                                  // Botón de eliminar (solo si eres el dueño)
-                                  if (isOwner)
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.delete_outline,
-                                        size: 18,
-                                        color: Colors.white38,
-                                      ),
-                                      onPressed: () async {
-                                        final confirmed = await ConfirmDialog.show(
-                                          context,
-                                          title: 'Eliminar comentario',
-                                          message:
-                                              '¿Estás seguro de que deseas eliminar este comentario?',
-                                          confirmText: 'Eliminar',
-                                          cancelText: 'Cancelar',
-                                          confirmColor: Colors.redAccent,
-                                        );
-
-                                        if (confirmed == true) {
-                                          await CommentService.deleteComment(
-                                            widget.postId,
-                                            commentId,
-                                            context,
-                                          );
-                                        }
-                                      },
-                                    ),
-                                ],
-                              ),
-                            ),
-                            subtitle: Text(
-                              commentText,
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 13,
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(20.0),
+                              child: CircularProgressIndicator(
+                                color: Colors.white24,
                               ),
                             ),
                           );
-                        },
-                      );
-                    },
-                  ),
+                        }
 
-                  // Espacio extra para que el teclado no tape el último comentario
-                  const SizedBox(height: 80),
-                ],
+                        final docs = snapshot.data?.docs ?? [];
+
+                        if (docs.isEmpty) {
+                          return const Padding(
+                            padding: EdgeInsets.all(32.0),
+                            child: Center(
+                              child: Text(
+                                'Sin comentarios',
+                                style: TextStyle(color: Colors.white30),
+                              ),
+                            ),
+                          );
+                        }
+
+                        return ListView.builder(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap:
+                              true, // Importante dentro de SingleChildScrollView
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: docs.length,
+                          itemBuilder: (context, index) {
+                            final data =
+                                docs[index].data() as Map<String, dynamic>;
+                            final commentText =
+                                data['com_text'] as String? ?? '';
+                            // Usamos el UID del autor del comentario
+                            final authorUid =
+                                data['com_authorUid'] as String? ?? '';
+                            final commentId = docs[index].id;
+                            final isOwner =
+                                _controller.currentUserId != null &&
+                                _controller.currentUserId == authorUid;
+
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 6,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: GestureDetector(
+                                          onTap: () => GoRouter.of(
+                                            context,
+                                          ).push('/profile/$authorUid'),
+                                          child: _UserNameFetcher(
+                                            uid: authorUid,
+                                          ),
+                                        ),
+                                      ),
+                                      if (isOwner)
+                                        SizedBox(
+                                          height: 24,
+                                          width: 24,
+                                          child: IconButton(
+                                            padding: EdgeInsets.zero,
+                                            icon: const Icon(
+                                              Icons.delete_outline,
+                                              size: 16,
+                                              color: Colors.white38,
+                                            ),
+                                            onPressed: () async {
+                                              final confirmed =
+                                                  await ConfirmDialog.show(
+                                                    context,
+                                                    title:
+                                                        'Eliminar comentario',
+                                                    message:
+                                                        '¿Estás seguro de que deseas eliminar este comentario?',
+                                                    confirmText: 'Eliminar',
+                                                    cancelText: 'Cancelar',
+                                                    confirmColor:
+                                                        Colors.redAccent,
+                                                  );
+
+                                              if (confirmed == true) {
+                                                await CommentService.deleteComment(
+                                                  widget.postId,
+                                                  commentId,
+                                                  context,
+                                                );
+                                              }
+                                            },
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      left: 36,
+                                      top: 2,
+                                    ),
+                                    child: Text(
+                                      commentText,
+                                      style: AppTypography.bodySmall.copyWith(
+                                        color: Colors.white70,
+                                        height: 1.3,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+
+                    // Espacio extra para que el teclado no tape el último comentario
+                    const SizedBox(height: 80),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -583,19 +512,18 @@ class _UserNameFetcher extends StatelessWidget {
     if (uid.isEmpty) {
       return Row(
         mainAxisSize: MainAxisSize.min, // Importante para no expandir el Layout
-        children: const [
-          CircleAvatar(
+        children: [
+          const CircleAvatar(
             radius: 14,
             backgroundColor: Colors.grey,
             child: Icon(Icons.person, size: 16, color: Colors.white),
           ),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Text(
             'Usuario UPS',
-            style: TextStyle(
+            style: AppTypography.body.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.w600,
-              fontSize: 14,
             ),
           ),
         ],
@@ -670,10 +598,9 @@ class _UserNameFetcher extends StatelessWidget {
             // Nombre
             Text(
               name,
-              style: const TextStyle(
+              style: AppTypography.body.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.w600,
-                fontSize: 14,
               ),
             ),
           ],

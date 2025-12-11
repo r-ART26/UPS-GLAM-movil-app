@@ -16,7 +16,7 @@ class AppTheme {
       onError: Colors.white,
 
       // Reemplazo moderno de background/onBackground
-      surface: AppColors.upsBlueDark,
+      surface: AppColors.darkBackground,
       onSurface: Colors.white,
 
       // Para compatibilidad, Flutter genera automáticamente:
@@ -34,60 +34,40 @@ class AppTheme {
         headlineLarge: AppTypography.titleUPS,
         headlineMedium: AppTypography.titleGlam,
         bodyLarge: AppTypography.body,
-        bodyMedium: AppTypography.subtitle,
+        bodyMedium: AppTypography.h2,
       ),
 
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.10),
+        fillColor: Colors.white.withOpacity(0.10),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: Colors.white.withValues(alpha: 0.25),
-          ),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.25)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(
-            color: AppColors.upsYellow,
-            width: 1.8,
-          ),
+          borderSide: const BorderSide(color: AppColors.upsYellow, width: 1.8),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(
-            color: Colors.redAccent,
-            width: 1.6,
-          ),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 1.6),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(
-            color: Colors.redAccent,
-            width: 1.8,
-          ),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 1.8),
         ),
-        hintStyle: TextStyle(
-          color: Colors.white.withValues(alpha: 0.45),
-        ),
-        labelStyle: const TextStyle(
-          color: Colors.white,
-        ),
+        hintStyle: TextStyle(color: Colors.white.withOpacity(0.45)),
+        labelStyle: const TextStyle(color: Colors.white),
       ),
 
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ButtonStyle(
           minimumSize: WidgetStateProperty.all(const Size.fromHeight(56)),
           shape: WidgetStateProperty.all(
-            RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(28),
-            ),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
           ),
           textStyle: WidgetStateProperty.all(
-            const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
+            const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
           ),
         ),
       ),

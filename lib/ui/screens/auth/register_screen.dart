@@ -3,9 +3,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
-import '../../widgets/buttons/primary_button.dart';
-import '../../widgets/effects/gradient_background.dart';
-import '../../widgets/inputs/text_input.dart';
+import '../../widgets/design_system/glam_button.dart';
+
+import '../../widgets/design_system/glam_input.dart';
 import '../../widgets/dialogs/error_dialog.dart';
 import '../../../services/api/api_service.dart';
 import '../../../services/config/app_config_service.dart';
@@ -25,7 +25,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
-  TextEditingController();
+      TextEditingController();
 
   @override
   void initState() {
@@ -143,7 +143,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         await ErrorDialog.show(
           context,
           title: 'Error de conexión',
-          message: 'No se puede conectar al servidor. Verifica la IP configurada.',
+          message:
+              'No se puede conectar al servidor. Verifica la IP configurada.',
         );
       }
       return;
@@ -199,7 +200,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           await ErrorDialog.show(
             context,
             title: 'Error del servidor',
-            message: 'Ocurrió un error al intentar registrarte. Por favor, intenta nuevamente.',
+            message:
+                'Ocurrió un error al intentar registrarte. Por favor, intenta nuevamente.',
           );
         }
       }
@@ -218,18 +220,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
           e.toString().contains('Connection refused') ||
           e.toString().contains('SocketException')) {
         errorTitle = 'Error de conexión';
-        errorMessage = 'No se puede conectar al servidor. Verifica que esté corriendo y la IP sea correcta.';
+        errorMessage =
+            'No se puede conectar al servidor. Verifica que esté corriendo y la IP sea correcta.';
         _isConnected = false;
       } else {
         errorTitle = 'Error de conexión';
         errorMessage = 'Error de conexión. Verifica tu conexión a internet.';
       }
 
-      await ErrorDialog.show(
-        context,
-        title: errorTitle,
-        message: errorMessage,
-      );
+      await ErrorDialog.show(context, title: errorTitle, message: errorMessage);
     }
   }
 
@@ -250,138 +249,153 @@ class _RegisterScreenState extends State<RegisterScreen> {
       },
       child: Scaffold(
         body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppGradients.welcomeBackground,
-        ),
-        child: SafeArea(
-          child: SizedBox.expand(
-            child: SingleChildScrollView(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: MediaQuery.of(context).size.height -
-                      MediaQuery.of(context).padding.vertical -
-                      48,
+          decoration: const BoxDecoration(
+            gradient: AppGradients.darkBackground,
+          ),
+          child: SafeArea(
+            child: SizedBox.expand(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32.0,
+                  vertical: 24.0,
                 ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Crear cuenta',
-                      style: AppTypography.subtitle,
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    /// Indicador de estado de conexión
-                    _buildConnectionStatus(),
-
-                    const SizedBox(height: 24),
-
-                    /// Nombre completo
-                    TextInput(
-                      label: 'Nombre completo',
-                      hintText: 'Ej. Juan Pérez',
-                      controller: _nameController,
-                      prefixIcon: Icons.person_outline,
-                      errorText: _nameError,
-                      onChanged: (_) {
-                        setState(() {
-                          _nameError = null;
-                        });
-                      },
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    /// Correo institucional
-                    TextInput(
-                      label: 'Correo institucional',
-                      hintText: 'usuario@est.ups.edu.ec',
-                      keyboardType: TextInputType.emailAddress,
-                      controller: _emailController,
-                      prefixIcon: Icons.email_outlined,
-                      errorText: _emailError,
-                      onChanged: (_) {
-                        setState(() {
-                          _emailError = null;
-                        });
-                      },
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    /// Contraseña
-                    TextInput(
-                      label: 'Contraseña',
-                      hintText: 'Ingrese su contraseña',
-                      obscureText: true,
-                      controller: _passwordController,
-                      prefixIcon: Icons.lock_outline,
-                      errorText: _passwordError,
-                      onChanged: (_) {
-                        setState(() {
-                          _passwordError = null;
-                        });
-                      },
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    /// Confirmar contraseña
-                    TextInput(
-                      label: 'Confirmar contraseña',
-                      hintText: 'Repita su contraseña',
-                      obscureText: true,
-                      controller: _confirmPasswordController,
-                      prefixIcon: Icons.lock_outline,
-                      errorText: _confirmPasswordError,
-                      onChanged: (_) {
-                        setState(() {
-                          _confirmPasswordError = null;
-                        });
-                      },
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    /// Botón para registrar
-                    PrimaryButton(
-                      label: _isLoading ? 'Registrando...' : 'Registrarme',
-                      isLoading: _isLoading,
-                      isDisabled: !_isFormValid || _isLoading || _isConnected == false,
-                      onPressed: _handleRegister,
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    /// Enlace a login
-                    Center(
-                      child: GestureDetector(
-                        onTap: () {
-                          context.go('/login');
-                        },
-                        child: const Text(
-                          '¿Ya tienes cuenta? Inicia sesión',
-                          style: TextStyle(
-                            color: AppColors.upsYellow,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight:
+                        MediaQuery.of(context).size.height -
+                        MediaQuery.of(context).padding.vertical -
+                        48,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      /// Título con Gradiente Dorado
+                      Center(
+                        child: ShaderMask(
+                          shaderCallback: (bounds) =>
+                              AppGradients.gold.createShader(bounds),
+                          child: const Text(
+                            'Crear cuenta',
+                            style: AppTypography.titleGlam,
                           ),
                         ),
                       ),
-                    ),
 
-                    const SizedBox(height: 20),
-                  ],
+                      const SizedBox(height: 32),
+
+                      /// Indicador de estado de conexión
+                      _buildConnectionStatus(),
+
+                      const SizedBox(height: 24),
+
+                      /// Nombre completo
+                      GlamInput(
+                        label: 'Nombre completo',
+                        hintText: 'Ej. Juan Pérez',
+                        controller: _nameController,
+                        prefixIcon: Icons.person_outline,
+                        errorText: _nameError,
+                        onChanged: (_) {
+                          setState(() {
+                            _nameError = null;
+                          });
+                        },
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      /// Correo institucional
+                      GlamInput(
+                        label: 'Correo institucional',
+                        hintText: 'usuario@est.ups.edu.ec',
+                        keyboardType: TextInputType.emailAddress,
+                        controller: _emailController,
+                        prefixIcon: Icons.email_outlined,
+                        errorText: _emailError,
+                        onChanged: (_) {
+                          setState(() {
+                            _emailError = null;
+                          });
+                        },
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      /// Contraseña
+                      GlamInput(
+                        label: 'Contraseña',
+                        hintText: 'Ingrese su contraseña',
+                        obscureText: true,
+                        controller: _passwordController,
+                        prefixIcon: Icons.lock_outline,
+                        errorText: _passwordError,
+                        onChanged: (_) {
+                          setState(() {
+                            _passwordError = null;
+                          });
+                        },
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      /// Confirmar contraseña
+                      GlamInput(
+                        label: 'Confirmar contraseña',
+                        hintText: 'Repita su contraseña',
+                        obscureText: true,
+                        controller: _confirmPasswordController,
+                        prefixIcon: Icons.lock_outline,
+                        errorText: _confirmPasswordError,
+                        onChanged: (_) {
+                          setState(() {
+                            _confirmPasswordError = null;
+                          });
+                        },
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      /// Botón para registrar
+                      GlamButton(
+                        label: _isLoading ? 'Registrando...' : 'Registrarme',
+                        isLoading: _isLoading,
+                        isDisabled:
+                            !_isFormValid ||
+                            _isLoading ||
+                            _isConnected == false,
+                        onPressed: _isLoading || !_isFormValid
+                            ? null
+                            : _handleRegister,
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      /// Enlace a login
+                      Center(
+                        child: GestureDetector(
+                          onTap: () {
+                            context.go('/login');
+                          },
+                          child: const Text(
+                            '¿Ya tienes cuenta? Inicia sesión',
+                            style: TextStyle(
+                              color: AppColors.upsYellow,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -429,10 +443,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               final serverUrl = snapshot.data ?? 'Servidor';
               return Text(
                 'Conectado a $serverUrl',
-                style: TextStyle(
-                  color: Colors.green.shade300,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: Colors.green.shade300, fontSize: 12),
               );
             },
           ),
@@ -455,10 +466,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           Expanded(
             child: Text(
               'No se puede conectar al servidor',
-              style: TextStyle(
-                color: Colors.red.shade300,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: Colors.red.shade300, fontSize: 12),
             ),
           ),
           TextButton(
@@ -470,10 +478,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             child: Text(
               'Reintentar',
-              style: TextStyle(
-                color: AppColors.upsYellow,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: AppColors.upsYellow, fontSize: 12),
             ),
           ),
         ],

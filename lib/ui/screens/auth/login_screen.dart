@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
-import '../../widgets/buttons/primary_button.dart';
-import '../../widgets/effects/gradient_background.dart';
-import '../../widgets/inputs/text_input.dart';
+import '../../widgets/design_system/glam_button.dart';
+
+import '../../widgets/design_system/glam_input.dart';
 import '../../widgets/dialogs/error_dialog.dart';
 import 'package:go_router/go_router.dart';
 import '../../../services/api/api_service.dart';
 import '../../../services/config/app_config_service.dart';
 import '../../../services/auth/auth_service.dart';
 
-
 /// Pantalla de inicio de sesión para la aplicación UPStagram.
-/// Con validación real usando el nuevo TextInput y PrimaryButton.
+/// Con validación real usando el nuevo GlamInput y GlamButton.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -116,7 +115,8 @@ class _LoginScreenState extends State<LoginScreen> {
         await ErrorDialog.show(
           context,
           title: 'Error de conexión',
-          message: 'No se puede conectar al servidor. Verifica la IP configurada.',
+          message:
+              'No se puede conectar al servidor. Verifica la IP configurada.',
         );
       }
       return;
@@ -129,21 +129,20 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       // Hacer petición al backend
-      final response = await ApiService.post(
-        '/api/auth/login',
-        {
-          'email': email,
-          'password': password,
-        },
-      );
+      final response = await ApiService.post('/api/auth/login', {
+        'email': email,
+        'password': password,
+      });
 
       if (!mounted) return;
 
       if (response.statusCode == 200) {
         // Login exitoso
         final token = response.body; // El servidor retorna el token como String
-        debugPrint('Login exitoso. Token: ${token.substring(0, token.length > 20 ? 20 : token.length)}...');
-        
+        debugPrint(
+          'Login exitoso. Token: ${token.substring(0, token.length > 20 ? 20 : token.length)}...',
+        );
+
         // Guardar el token para futuras peticiones autenticadas
         final saved = await AuthService.saveToken(token);
         if (!saved) {
@@ -159,7 +158,7 @@ class _LoginScreenState extends State<LoginScreen> {
           }
           return;
         }
-        
+
         // Navegar al feed
         if (mounted) {
           context.go('/home/feed');
@@ -173,7 +172,8 @@ class _LoginScreenState extends State<LoginScreen> {
           await ErrorDialog.show(
             context,
             title: 'Error de autenticación',
-            message: 'Credenciales incorrectas. Verifica tu correo y contraseña.',
+            message:
+                'Credenciales incorrectas. Verifica tu correo y contraseña.',
           );
         }
       } else {
@@ -185,37 +185,35 @@ class _LoginScreenState extends State<LoginScreen> {
           await ErrorDialog.show(
             context,
             title: 'Error del servidor',
-            message: 'Ocurrió un error al intentar iniciar sesión. Por favor, intenta nuevamente.',
+            message:
+                'Ocurrió un error al intentar iniciar sesión. Por favor, intenta nuevamente.',
           );
         }
       }
     } catch (e) {
       if (!mounted) return;
-      
+
       debugPrint('Error en login: $e');
       setState(() {
         _isLoading = false;
       });
-      
+
       // Detectar tipo de error
       String errorMessage;
       String errorTitle;
-      if (e.toString().contains('Failed host lookup') || 
+      if (e.toString().contains('Failed host lookup') ||
           e.toString().contains('Connection refused') ||
           e.toString().contains('SocketException')) {
         errorTitle = 'Error de conexión';
-        errorMessage = 'No se puede conectar al servidor. Verifica que esté corriendo y la IP sea correcta.';
+        errorMessage =
+            'No se puede conectar al servidor. Verifica que esté corriendo y la IP sea correcta.';
         _isConnected = false;
       } else {
         errorTitle = 'Error de conexión';
         errorMessage = 'Error de conexión. Verifica tu conexión a internet.';
       }
-      
-      await ErrorDialog.show(
-        context,
-        title: errorTitle,
-        message: errorMessage,
-      );
+
+      await ErrorDialog.show(context, title: errorTitle, message: errorMessage);
     }
   }
 
@@ -236,117 +234,129 @@ class _LoginScreenState extends State<LoginScreen> {
       },
       child: Scaffold(
         body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppGradients.welcomeBackground,
-        ),
-        child: SafeArea(
-          child: SizedBox.expand(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 32.0,
-                vertical: 24.0,
-              ),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: MediaQuery.of(context).size.height -
-                      MediaQuery.of(context).padding.vertical -
-                      48,
+          decoration: const BoxDecoration(
+            gradient: AppGradients.darkBackground,
+          ),
+          child: SafeArea(
+            child: SizedBox.expand(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32.0,
+                  vertical: 24.0,
                 ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    /// Título principal
-                    const Text(
-                      'Iniciar sesión',
-                      style: AppTypography.subtitle,
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    /// Indicador de estado de conexión
-                    _buildConnectionStatus(),
-
-                    const SizedBox(height: 24),
-
-                    /// Campo de correo
-                    TextInput(
-                      label: 'Correo institucional',
-                      hintText: 'usuario@est.ups.edu.ec',
-                      prefixIcon: Icons.email_outlined,
-                      keyboardType: TextInputType.emailAddress,
-                      controller: _emailController,
-                      errorText: _emailError,
-                      onChanged: (_) {
-                        // Limpiar error mientras el usuario corrige
-                        if (_emailError != null) {
-                          setState(() {
-                            _emailError = null;
-                          });
-                        } else {
-                          setState(() {});
-                        }
-                      },
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    /// Campo de contraseña
-                    TextInput(
-                      label: 'Contraseña',
-                      hintText: 'Ingrese su contraseña',
-                      prefixIcon: Icons.lock_outline,
-                      obscureText: true,
-                      controller: _passwordController,
-                      errorText: _passwordError,
-                      onChanged: (_) {
-                        if (_passwordError != null) {
-                          setState(() {
-                            _passwordError = null;
-                          });
-                        } else {
-                          setState(() {});
-                        }
-                      },
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    /// Botón para iniciar sesión
-                    PrimaryButton(
-                      label: _isLoading ? 'Ingresando...' : 'Ingresar',
-                      isLoading: _isLoading,
-                      isDisabled: !_isFormValid || _isLoading || _isConnected == false,
-                      onPressed: _handleLogin,
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    /// Enlace a pantalla de registro
-                    Center(
-                      child: GestureDetector(
-                        onTap: () {
-                          context.push('/register');
-                        },
-                        child: const Text(
-                          '¿No tienes cuenta? Regístrate aquí',
-                          style: TextStyle(
-                            color: AppColors.upsYellow,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight:
+                        MediaQuery.of(context).size.height -
+                        MediaQuery.of(context).padding.vertical -
+                        48,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      /// Título con Gradiente Dorado
+                      Center(
+                        child: ShaderMask(
+                          shaderCallback: (bounds) =>
+                              AppGradients.gold.createShader(bounds),
+                          child: const Text(
+                            'Iniciar sesión',
+                            style: AppTypography.titleGlam,
                           ),
                         ),
                       ),
-                    ),
 
-                    const SizedBox(height: 20),
-                  ],
+                      const SizedBox(height: 32),
+
+                      /// Indicador de estado de conexión
+                      _buildConnectionStatus(),
+
+                      const SizedBox(height: 24),
+
+                      /// Campo de correo
+                      GlamInput(
+                        label: 'Correo institucional',
+                        hintText: 'usuario@est.ups.edu.ec',
+                        prefixIcon: Icons.email_outlined,
+                        keyboardType: TextInputType.emailAddress,
+                        controller: _emailController,
+                        errorText: _emailError,
+                        onChanged: (_) {
+                          // Limpiar error mientras el usuario corrige
+                          if (_emailError != null) {
+                            setState(() {
+                              _emailError = null;
+                            });
+                          } else {
+                            setState(() {});
+                          }
+                        },
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      /// Campo de contraseña
+                      GlamInput(
+                        label: 'Contraseña',
+                        hintText: 'Ingrese su contraseña',
+                        prefixIcon: Icons.lock_outline,
+                        obscureText: true,
+                        controller: _passwordController,
+                        errorText: _passwordError,
+                        onChanged: (_) {
+                          if (_passwordError != null) {
+                            setState(() {
+                              _passwordError = null;
+                            });
+                          } else {
+                            setState(() {});
+                          }
+                        },
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      /// Botón para iniciar sesión
+                      GlamButton(
+                        label: _isLoading ? 'Ingresando...' : 'Ingresar',
+                        isLoading: _isLoading,
+                        isDisabled:
+                            !_isFormValid ||
+                            _isLoading ||
+                            _isConnected == false,
+                        onPressed: _isLoading || !_isFormValid
+                            ? null
+                            : _handleLogin,
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      /// Enlace a pantalla de registro
+                      Center(
+                        child: GestureDetector(
+                          onTap: () {
+                            context.push('/register');
+                          },
+                          child: const Text(
+                            '¿No tienes cuenta? Regístrate aquí',
+                            style: TextStyle(
+                              color: AppColors.upsYellow,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -394,10 +404,7 @@ class _LoginScreenState extends State<LoginScreen> {
               final serverUrl = snapshot.data ?? 'Servidor';
               return Text(
                 'Conectado a $serverUrl',
-                style: TextStyle(
-                  color: Colors.green.shade300,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: Colors.green.shade300, fontSize: 12),
               );
             },
           ),
@@ -420,10 +427,7 @@ class _LoginScreenState extends State<LoginScreen> {
           Expanded(
             child: Text(
               'No se puede conectar al servidor',
-              style: TextStyle(
-                color: Colors.red.shade300,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: Colors.red.shade300, fontSize: 12),
             ),
           ),
           TextButton(
@@ -435,10 +439,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             child: Text(
               'Reintentar',
-              style: TextStyle(
-                color: AppColors.upsYellow,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: AppColors.upsYellow, fontSize: 12),
             ),
           ),
         ],

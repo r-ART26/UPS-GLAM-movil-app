@@ -1,10 +1,11 @@
+import 'dart:ui'; // For image filter
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../theme/typography.dart';
 import '../../theme/colors.dart';
-import '../../widgets/buttons/primary_button.dart';
-import '../../widgets/effects/gradient_background.dart';
+import '../../widgets/design_system/glam_button.dart';
+
 import '../../../services/config/app_config_service.dart';
 import '../../../services/discovery/network_discovery_service.dart';
 
@@ -17,8 +18,15 @@ class WelcomeScreen extends StatefulWidget {
   State<WelcomeScreen> createState() => _WelcomeScreenState();
 }
 
-class _WelcomeScreenState extends State<WelcomeScreen> {
+class _WelcomeScreenState extends State<WelcomeScreen>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _ipController = TextEditingController();
+
+  // Animation state
+  late AnimationController _animController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
   String? _ipError;
   bool _isSaving = false;
   List<String> _discoveredServers = [];
@@ -28,6 +36,29 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   @override
   void initState() {
     super.initState();
+
+    // Setup Animations
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+
+    _fadeAnimation = CurvedAnimation(
+      parent: _animController,
+      curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+    );
+
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _animController,
+            curve: const Interval(0.0, 0.6, curve: Curves.easeOutCubic),
+          ),
+        );
+
+    // Start animation
+    _animController.forward();
+
     _loadSavedIp();
     _scanForServers();
   }
@@ -35,6 +66,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   @override
   void dispose() {
     _ipController.dispose();
+    _animController.dispose();
     super.dispose();
   }
 
@@ -44,7 +76,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     if (mounted) {
       setState(() {
         _ipController.text = savedIp;
-        // No establecer _selectedServerIp aquí, esperar a que termine el escaneo
       });
     }
   }
@@ -53,66 +84,47 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   Future<void> _scanForServers() async {
     if (_isScanning) return;
 
-    // Guardar el valor actual antes de limpiar
     final currentSelectedIp = _selectedServerIp;
     final currentText = _ipController.text.trim();
 
     setState(() {
       _isScanning = true;
       _discoveredServers = [];
-      // Limpiar la selección del dropdown temporalmente para evitar errores
-      // pero mantener el texto en el controlador
       _selectedServerIp = null;
     });
 
     try {
-      final servers = await NetworkDiscoveryService.discoverServers()
-          .timeout(const Duration(minutes: 2), onTimeout: () {
-        // Si el escaneo tarda más de 2 minutos, retornar lista vacía
-        return <String>[];
-      });
-      
+      final servers = await NetworkDiscoveryService.discoverServers().timeout(
+        const Duration(minutes: 2),
+        onTimeout: () => <String>[],
+      );
+
       if (mounted) {
-        // Usar el texto actual o el que estaba guardado
-        final savedIp = _ipController.text.trim().isNotEmpty 
-            ? _ipController.text.trim() 
+        final savedIp = _ipController.text.trim().isNotEmpty
+            ? _ipController.text.trim()
             : currentText;
-        
+
         setState(() {
           _discoveredServers = servers;
           _isScanning = false;
-          
-          // Si hay servidores encontrados, seleccionar automáticamente
+
           if (servers.isNotEmpty) {
-            // Prioridad 1: Si la IP guardada/actual está en la lista, seleccionarla
             if (savedIp.isNotEmpty && servers.contains(savedIp)) {
               _selectedServerIp = savedIp;
               _ipController.text = savedIp;
-              print('[WELCOME] Servidor seleccionado automáticamente (IP guardada): $savedIp');
-            } 
-            // Prioridad 2: Si la IP previamente seleccionada está en la lista, mantenerla
-            else if (currentSelectedIp != null && servers.contains(currentSelectedIp)) {
+            } else if (currentSelectedIp != null &&
+                servers.contains(currentSelectedIp)) {
               _selectedServerIp = currentSelectedIp;
               _ipController.text = currentSelectedIp;
-              print('[WELCOME] Servidor seleccionado automáticamente (previamente seleccionado): $currentSelectedIp');
-            }
-            // Prioridad 3: Seleccionar el primer servidor encontrado
-            else {
+            } else {
               _selectedServerIp = servers.first;
               _ipController.text = servers.first;
-              print('[WELCOME] Servidor seleccionado automáticamente (primero encontrado): ${servers.first}');
             }
-          }
-          // Si no hay servidores pero hay una IP guardada, mantenerla en modo manual
-          else if (savedIp.isNotEmpty) {
-            _selectedServerIp = null; // Modo manual, pero mantener el texto
-            _ipController.text = savedIp; // Asegurar que el texto se mantenga
-            print('[WELCOME] No se encontraron servidores, modo manual con IP: $savedIp');
-          }
-          // Si no hay servidores ni IP guardada, modo manual vacío
-          else {
+          } else if (savedIp.isNotEmpty) {
             _selectedServerIp = null;
-            print('[WELCOME] No se encontraron servidores, modo manual vacío');
+            _ipController.text = savedIp;
+          } else {
+            _selectedServerIp = null;
           }
         });
       }
@@ -121,7 +133,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         setState(() {
           _isScanning = false;
           _discoveredServers = [];
-          // Si hay una IP guardada pero no se encontraron servidores, usar modo manual
           if (_ipController.text.trim().isNotEmpty) {
             _selectedServerIp = null;
           }
@@ -132,55 +143,40 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   /// Valida y guarda la IP del servidor.
   Future<void> _handleContinue() async {
-    // Obtener IP del dropdown seleccionado o del campo de texto
     String ip = _selectedServerIp ?? _ipController.text.trim();
-    
-    // Si hay una IP seleccionada en el dropdown, asegurarse de que el texto también la tenga
+
     if (_selectedServerIp != null && _selectedServerIp!.isNotEmpty) {
       _ipController.text = _selectedServerIp!;
       ip = _selectedServerIp!;
     }
 
-    // Validar IP
     setState(() {
       _ipError = null;
     });
 
     if (ip.isEmpty) {
-      setState(() {
-        _ipError = 'Ingrese la dirección IP del servidor';
-      });
+      setState(() => _ipError = 'Ingrese la dirección IP del servidor');
       return;
     }
 
     if (!AppConfigService.isValidIp(ip)) {
-      setState(() {
-        _ipError = 'Ingrese una dirección IP válida (ej: 192.168.1.100)';
-      });
+      setState(() => _ipError = 'Ingrese una dirección IP válida');
       return;
     }
 
-    // Guardar IP
-    setState(() {
-      _isSaving = true;
-    });
+    setState(() => _isSaving = true);
 
     final saved = await AppConfigService.setServerIp(ip);
-    
+
     if (!mounted) return;
 
-    setState(() {
-      _isSaving = false;
-    });
+    setState(() => _isSaving = false);
 
     if (!saved) {
-      setState(() {
-        _ipError = 'Error al guardar la configuración';
-      });
+      setState(() => _ipError = 'Error al guardar la configuración');
       return;
     }
 
-    // Navegar al login
     context.go('/login');
   }
 
@@ -190,294 +186,299 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       canPop: false,
       onPopInvoked: (didPop) {
         if (!didPop) {
-          // Si hay historial, hacer pop
           if (context.canPop()) {
             context.pop();
           }
-          // Si no hay historial, no hacer nada (evitar que cierre la app)
         }
       },
       child: Scaffold(
         body: Container(
-        decoration: BoxDecoration(
-          gradient: AppGradients.welcomeBackground,
-        ),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 40),
-                  
-                  Row(
-                    children: const [
-                      Text('UPS', style: AppTypography.titleUPS),
-                      SizedBox(width: 4),
-                      Text('tagram', style: AppTypography.titleGlam),
-                    ],
-                  ),
-
-                  const SizedBox(height: 8),
-                  const Text('Bienvenido', style: AppTypography.subtitle),
-
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Explora, publica y comparte fotografías con la comunidad UPS.',
-                    style: AppTypography.body,
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  /// Campo para configurar la IP del servidor con descubrimiento automático
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: const Text(
-                              'Dirección IP del servidor',
-                              style: TextStyle(
-                                color: AppColors.textWhite,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w500,
+          decoration: const BoxDecoration(
+            gradient: AppGradients.darkBackground,
+          ),
+          child: SafeArea(
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: SlideTransition(
+                position: _slideAnimation,
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            const Text('UPS', style: AppTypography.titleUPS),
+                            const SizedBox(width: 6),
+                            ShaderMask(
+                              shaderCallback: (bounds) =>
+                                  AppGradients.gold.createShader(bounds),
+                              child: const Text(
+                                'tagram',
+                                style: AppTypography.titleGlam,
                               ),
                             ),
-                          ),
-                          if (_isScanning)
-                            const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
-                              ),
-                            )
-                          else
-                            IconButton(
-                              icon: const Icon(Icons.refresh, color: Colors.white70),
-                              onPressed: _scanForServers,
-                              tooltip: 'Buscar servidores',
-                              iconSize: 20,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.10),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: _ipError != null
-                                ? Colors.redAccent
-                                : Colors.white.withValues(alpha: 0.25),
-                            width: _ipError != null ? 1.6 : 1.0,
+                          ],
+                        ),
+
+                        const SizedBox(height: 12),
+                        Container(
+                          width: 60,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            gradient: AppGradients.gold,
+                            borderRadius: BorderRadius.circular(3),
                           ),
                         ),
-                        child: DropdownButtonFormField<String>(
-                          value: _selectedServerIp != null && 
-                                 (_discoveredServers.contains(_selectedServerIp) || 
-                                  _ipController.text.trim() == _selectedServerIp)
-                                 ? _selectedServerIp
-                                 : null,
-                          decoration: InputDecoration(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
-                            border: InputBorder.none,
-                            hintText: 'Selecciona o escribe la IP',
-                            hintStyle: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.45),
-                            ),
-                            prefixIcon: const Icon(
-                              Icons.dns_outlined,
-                              color: Colors.white70,
-                            ),
-                            suffixIcon: _discoveredServers.isEmpty
-                                ? null
-                                : const Icon(
-                                    Icons.arrow_drop_down,
-                                    color: Colors.white70,
-                                  ),
-                            errorText: _ipError,
-                            errorStyle: const TextStyle(
-                              color: Colors.redAccent,
-                              fontSize: 13,
-                              height: 1.2,
-                            ),
+
+                        const SizedBox(height: 32),
+                        const Text('Bienvenido', style: AppTypography.h2),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Explora, publica y comparte fotografías con la comunidad universitaria de la UPS.',
+                          style: AppTypography.body.copyWith(
+                            color: Colors.white.withOpacity(0.8),
+                            height: 1.5,
                           ),
-                          dropdownColor: AppColors.upsBlueDark,
-                          style: const TextStyle(
-                            color: AppColors.textWhite,
-                            fontSize: 16,
+                        ),
+
+                        const SizedBox(height: 48),
+
+                        // SERVER CONFIG CARD (Glassmorphism)
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: AppColors.glassWhite,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: AppColors.glassBorder),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 20,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
                           ),
-                          iconEnabledColor: Colors.white70,
-                          items: [
-                            // Opción para escribir manualmente
-                            const DropdownMenuItem<String>(
-                              value: null,
-                              child: Row(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
                                 children: [
-                                  Icon(Icons.edit, color: Colors.white70, size: 18),
-                                  SizedBox(width: 8),
-                                  Text('Escribir manualmente'),
+                                  Icon(
+                                    Icons.dns_rounded,
+                                    color: AppColors.upsYellow,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'Conexión al Servidor',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  if (_isScanning)
+                                    const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white70,
+                                            ),
+                                      ),
+                                    )
+                                  else
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.refresh_rounded,
+                                        color: Colors.white70,
+                                      ),
+                                      onPressed: _scanForServers,
+                                      tooltip: 'Buscar servidores',
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                    ),
                                 ],
                               ),
-                            ),
-                            // Servidores encontrados
-                            ..._discoveredServers.map((ip) {
-                              return DropdownMenuItem<String>(
-                                value: ip,
-                                child: Row(
+
+                              const SizedBox(height: 16),
+
+                              // Select or Type
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: _ipError != null
+                                        ? AppColors.error
+                                        : Colors.transparent,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Icon(
-                                      Icons.check_circle_outline,
-                                      color: Colors.greenAccent,
-                                      size: 18,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(ip),
+                                    if (_discoveredServers.isNotEmpty)
+                                      DropdownButtonFormField<String>(
+                                        value:
+                                            _selectedServerIp != null &&
+                                                (_discoveredServers.contains(
+                                                      _selectedServerIp,
+                                                    ) ||
+                                                    _ipController.text.trim() ==
+                                                        _selectedServerIp)
+                                            ? _selectedServerIp
+                                            : null,
+                                        decoration: InputDecoration(
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                horizontal: 16,
+                                                vertical: 12,
+                                              ),
+                                          border: InputBorder.none,
+                                          prefixIcon: const Icon(
+                                            Icons.wifi_tethering,
+                                            color: Colors.white54,
+                                          ),
+                                        ),
+                                        dropdownColor: AppColors.darkBackground,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                        ),
+                                        iconEnabledColor: Colors.white70,
+                                        hint: Text(
+                                          'Seleccionar servidor',
+                                          style: TextStyle(
+                                            color: Colors.white.withOpacity(
+                                              0.5,
+                                            ),
+                                          ),
+                                        ),
+                                        items: [
+                                          const DropdownMenuItem<String>(
+                                            value: null,
+                                            child: Text(
+                                              'Escribir manualmente...',
+                                            ),
+                                          ),
+                                          ..._discoveredServers.map(
+                                            (ip) => DropdownMenuItem(
+                                              value: ip,
+                                              child: Text(ip),
+                                            ),
+                                          ),
+                                        ],
+                                        onChanged: (value) {
+                                          setState(() {
+                                            _selectedServerIp = value;
+                                            if (value != null) {
+                                              _ipController.text = value;
+                                            } else {
+                                              _ipController.clear();
+                                            }
+                                            _ipError = null;
+                                          });
+                                        },
+                                      ),
+
+                                    if (_selectedServerIp == null ||
+                                        _discoveredServers.isEmpty)
+                                      TextField(
+                                        controller: _ipController,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                        ),
+                                        decoration: InputDecoration(
+                                          hintText: 'Ej: 192.168.1.100',
+                                          hintStyle: TextStyle(
+                                            color: Colors.white.withOpacity(
+                                              0.3,
+                                            ),
+                                          ),
+                                          border: InputBorder.none,
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                horizontal: 16,
+                                                vertical: 14,
+                                              ),
+                                          prefixIcon: const Icon(
+                                            Icons.edit_rounded,
+                                            color: Colors.white54,
+                                            size: 20,
+                                          ),
+                                        ),
+                                        onChanged: (val) {
+                                          if (_selectedServerIp != null &&
+                                              val != _selectedServerIp) {
+                                            setState(
+                                              () => _selectedServerIp = null,
+                                            );
+                                          }
+                                          if (_ipError != null)
+                                            setState(() => _ipError = null);
+                                        },
+                                      ),
                                   ],
                                 ),
-                              );
-                            }),
-                          ],
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedServerIp = value;
-                              if (value != null) {
-                                _ipController.text = value;
-                              } else {
-                                // Si selecciona "Escribir manualmente", limpiar y enfocar
-                                _ipController.clear();
-                              }
-                              _ipError = null;
-                            });
-                          },
-                        ),
-                      ),
-                      // Campo de texto para escribir manualmente (visible cuando se selecciona "Escribir manualmente" o cuando no hay servidores)
-                      if (_selectedServerIp == null || _discoveredServers.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: TextField(
-                            controller: _ipController,
-                            keyboardType: TextInputType.text,
-                            style: const TextStyle(
-                              color: AppColors.textWhite,
-                              fontSize: 16,
-                            ),
-                            decoration: InputDecoration(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 14,
                               ),
-                              filled: true,
-                              fillColor: Colors.white.withValues(alpha: 0.10),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: _ipError != null
-                                      ? Colors.redAccent
-                                      : Colors.white.withValues(alpha: 0.25),
-                                  width: _ipError != null ? 1.6 : 1.0,
+
+                              if (_ipError != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    top: 8,
+                                    left: 4,
+                                  ),
+                                  child: Text(
+                                    _ipError!,
+                                    style: const TextStyle(
+                                      color: AppColors.error,
+                                      fontSize: 13,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: _ipError != null
-                                      ? Colors.redAccent
-                                      : Colors.white.withValues(alpha: 0.25),
-                                  width: _ipError != null ? 1.6 : 1.0,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: _ipError != null
-                                      ? Colors.redAccent
-                                      : Colors.white.withValues(alpha: 0.5),
-                                  width: _ipError != null ? 1.6 : 1.5,
-                                ),
-                              ),
-                              hintText: 'Ej: 192.168.1.100 o localhost',
-                              hintStyle: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.45),
-                              ),
-                              prefixIcon: const Icon(
-                                Icons.edit,
-                                color: Colors.white70,
-                              ),
-                            ),
-                            onChanged: (value) {
-                              setState(() {
-                                // Si el usuario escribe manualmente y el valor no coincide con el seleccionado,
-                                // cambiar a modo manual
-                                if (_selectedServerIp != null && value != _selectedServerIp) {
-                                  _selectedServerIp = null;
-                                }
-                                if (_ipError != null) {
-                                  _ipError = null;
-                                }
-                              });
-                            },
-                          ),
-                        ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _isScanning
-                                ? const Text(
-                                    'Buscando servidores en la red...',
+
+                              const SizedBox(height: 8),
+
+                              // Status Text
+                              if (!_isScanning && _discoveredServers.isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 4),
+                                  child: Text(
+                                    'ℹ️ No se encontraron servidores locales. Ingresa la IP manualmente.',
                                     style: TextStyle(
-                                      color: Colors.white70,
+                                      color: Colors.white.withOpacity(0.5),
                                       fontSize: 12,
                                     ),
-                                  )
-                                : _discoveredServers.isEmpty
-                                    ? const Text(
-                                        'No se encontraron servidores. Escribe la IP manualmente.',
-                                        style: TextStyle(
-                                          color: Colors.white70,
-                                          fontSize: 12,
-                                        ),
-                                      )
-                                    : Text(
-                                        '${_discoveredServers.length} servidor(es) encontrado(s)',
-                                        style: const TextStyle(
-                                          color: Colors.greenAccent,
-                                          fontSize: 12,
-                                        ),
-                                      ),
+                                  ),
+                                ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
+                        ),
 
-                  const SizedBox(height: 48),
-                  
-                  PrimaryButton(
-                    label: 'Continuar',
-                    isLoading: _isSaving,
-                    onPressed: _isSaving ? null : _handleContinue,
+                        const SizedBox(height: 48),
+
+                        GlamButton(
+                          label: 'Continuar',
+                          isLoading: _isSaving,
+                          onPressed: _isSaving ? null : _handleContinue,
+                        ),
+
+                        const SizedBox(height: 40),
+                      ],
+                    ),
                   ),
-                  
-                  const SizedBox(height: 40),
-                ],
+                ),
               ),
             ),
           ),
         ),
-      ),
       ),
     );
   }
