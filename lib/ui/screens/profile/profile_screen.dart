@@ -11,6 +11,7 @@ import '../../../services/auth/auth_service.dart';
 import '../../../services/subscriptions/subscription_service.dart';
 import '../../../models/user_model.dart';
 import '../post/post_detail_screen.dart';
+import 'edit_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? userId; // Si es null, es MI perfil
@@ -163,9 +164,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                onTap: () {
+                onTap: () async {
                   Navigator.of(dialogContext).pop();
-                  // TODO: Navegar a "editar perfil"
+                  final result = await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => EditProfileScreen(
+                        currentName: _userName ?? '',
+                        currentBio: _userBio ?? '',
+                        currentPhotoUrl: _photoUrl,
+                      ),
+                    ),
+                  );
+
+                  // Si se guardaron cambios, recargar perfil
+                  if (result == true) {
+                    await _loadUserData();
+                  }
                 },
               ),
               const Divider(color: Colors.white24),
@@ -380,15 +394,96 @@ class _ProfileScreenState extends State<ProfileScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 children: [
-                  CircleAvatar(
-                    radius: 46,
-                    backgroundColor: AppColors.upsBlue,
-                    backgroundImage:
-                        (_photoUrl != null && _photoUrl!.isNotEmpty)
-                        ? NetworkImage(_photoUrl!)
-                        : NetworkImage(
-                            'https://ui-avatars.com/api/?name=${Uri.encodeComponent(_userName ?? 'Usuario')}&background=003F87&color=fff&size=200&bold=true',
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      // Avatar
+                      CircleAvatar(
+                        radius: 46,
+                        backgroundColor: AppColors.upsBlue,
+                        backgroundImage:
+                            (_photoUrl != null && _photoUrl!.isNotEmpty)
+                            ? NetworkImage(_photoUrl!)
+                            : NetworkImage(
+                                'https://ui-avatars.com/api/?name=${Uri.encodeComponent(_userName ?? 'Usuario')}&background=003F87&color=fff&size=200&bold=true',
+                              ),
+                      ),
+
+                      // Bocadillo de Estado (Lateral Derecho)
+                      if (_userBio != null && _userBio!.isNotEmpty)
+                        Positioned(
+                          top: 0,
+                          right: -85,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              // El pico del globo (triángulo apuntando al avatar)
+                              Positioned(
+                                top: 12,
+                                left: -6,
+                                child: Transform.rotate(
+                                  angle: -0.785, // -45 grados
+                                  child: Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.05),
+                                          blurRadius: 4,
+                                          offset: const Offset(-1, 1),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // El cuerpo del globo
+                              Container(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 110,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.1),
+                                      blurRadius: 8,
+                                      offset: const Offset(2, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Text(
+                                  _userBio!,
+                                  textAlign: TextAlign.start,
+                                  maxLines: 4,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppColors.upsBlueDark,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.2,
+                                  ),
+                                ),
+                              ),
+                              // Parche para tapar la sombra interna del pico donde se une al globo
+                              Positioned(
+                                top: 10,
+                                left: 0,
+                                width: 10,
+                                height: 16,
+                                child: Container(color: Colors.white),
+                              ),
+                            ],
                           ),
+                        ),
+                    ],
                   ),
 
                   const SizedBox(height: 12),
