@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme/colors.dart';
-import '../../../services/auth/auth_service.dart';
 import '../../widgets/dialogs/confirm_dialog.dart';
 import '../../widgets/like_button.dart';
 import '../../../services/posts/comment_service.dart';
-import '../../../services/auth/auth_service.dart';
 import '../../widgets/full_screen_image_viewer.dart';
+import 'post_detail_controller.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final String postId;
@@ -28,65 +27,18 @@ class PostDetailScreen extends StatefulWidget {
 }
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
-  final TextEditingController _commentController = TextEditingController();
-  String _currentUserName = 'Usuario';
-  String? _currentUserPhotoUrl; // Foto del usuario actual
-
-  bool _isPostingComment = false;
-  bool _isComposing = false;
-  String? _currentUserId;
+  late final PostDetailController _controller;
 
   @override
   void initState() {
     super.initState();
-    _loadCurrentUser();
-    // _loadCurrentUserId ya no es estrictamente necesario si hacemos todo en _loadCurrentUser,
-    // pero lo dejamos para no romper nada que dependa de _currentUserId pronto.
-    _commentController.addListener(() {
-      setState(() {
-        _isComposing = _commentController.text.trim().isNotEmpty;
-      });
-    });
-  }
-
-  Future<void> _loadCurrentUser() async {
-    final uid = await AuthService.getUserId();
-    if (uid != null) {
-      if (mounted) setState(() => _currentUserId = uid);
-
-      try {
-        // Obtener datos frescos de Firestore para tener la foto más reciente
-        final doc = await FirebaseFirestore.instance
-            .collection('Users')
-            .doc(uid)
-            .get();
-        if (doc.exists && mounted) {
-          final data = doc.data()!;
-          setState(() {
-            _currentUserName = data['usr_username'] as String? ?? 'Usuario';
-            _currentUserPhotoUrl = data['usr_photoUrl'] as String?;
-          });
-        }
-      } catch (e) {
-        debugPrint('Error cargando usuario actual: $e');
-      }
-    }
+    _controller = PostDetailController(postId: widget.postId);
   }
 
   @override
   void dispose() {
-    _commentController.dispose();
+    _controller.dispose();
     super.dispose();
-  }
-
-  // Referencia a Firestore para leer comentarios
-  Stream<QuerySnapshot> get _commentsStream {
-    return FirebaseFirestore.instance
-        .collection('Posts')
-        .doc(widget.postId)
-        .collection('Comments')
-        .orderBy('com_timestamp', descending: true)
-        .snapshots();
   }
 
   /// Muestra el modal con la lista de usuarios que dieron like
@@ -121,13 +73,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             // Lista de Likes
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('Posts')
-                    .doc(widget.postId)
-                    .collection('Likes')
-                    // Ordenamos por fecha si existe, sino por defecto
-                    .orderBy('lik_timestamp', descending: true)
-                    .snapshots(),
+                stream: _controller.likesStream,
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
                     return const Center(
@@ -180,43 +126,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     );
   }
 
-  Future<void> _handlePostComment() async {
-    final text = _commentController.text.trim();
-    if (text.isEmpty || _currentUserId == null) return;
-
-    setState(() {
-      _isPostingComment = true;
-    });
-
-    try {
-      await FirebaseFirestore.instance
-          .collection('Posts')
-          .doc(widget.postId)
-          .collection('Comments')
-          .add({
-            'com_text': text,
-            'com_authorUid': _currentUserId,
-            'com_timestamp': FieldValue.serverTimestamp(),
-          });
-
-      _commentController.clear();
-      if (mounted) FocusScope.of(context).unfocus();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error al publicar: $e')));
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isPostingComment = false;
-          _isComposing = false;
-        });
-      }
-    }
-  }
-
   void _showCommentInput(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -226,53 +135,61 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: AppColors.upsBlue,
-                  backgroundImage:
-                      (_currentUserPhotoUrl != null &&
-                          _currentUserPhotoUrl!.isNotEmpty)
-                      ? NetworkImage(_currentUserPhotoUrl!)
-                      : NetworkImage(
-                          'https://ui-avatars.com/api/?name=${Uri.encodeComponent(_currentUserName)}&background=003F87&color=fff&size=150&bold=true',
-                        ),
+        return ListenableBuilder(
+          listenable: _controller,
+          builder: (context, _) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _commentController,
-                    autofocus: true,
-                    minLines: 1,
-                    maxLines: 4,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
-                      hintText: 'Escribe tu comentario...',
-                      hintStyle: TextStyle(color: Colors.white38),
-                      border: InputBorder.none,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor: AppColors.upsBlue,
+                      backgroundImage:
+                          (_controller.currentUserPhotoUrl != null &&
+                              _controller.currentUserPhotoUrl!.isNotEmpty)
+                          ? NetworkImage(_controller.currentUserPhotoUrl!)
+                          : NetworkImage(
+                              'https://ui-avatars.com/api/?name=${Uri.encodeComponent(_controller.currentUserName)}&background=003F87&color=fff&size=150&bold=true',
+                            ),
                     ),
-                  ),
-                ),
-                ValueListenableBuilder<TextEditingValue>(
-                  valueListenable: _commentController,
-                  builder: (context, value, child) {
-                    final hasText = value.text.trim().isNotEmpty;
-                    return TextButton(
-                      onPressed: (hasText && !_isPostingComment)
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: _controller.commentController,
+                        autofocus: true,
+                        minLines: 1,
+                        maxLines: 4,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: const InputDecoration(
+                          hintText: 'Escribe tu comentario...',
+                          hintStyle: TextStyle(color: Colors.white38),
+                          border: InputBorder.none,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed:
+                          (_controller.isComposing &&
+                              !_controller.isPostingComment)
                           ? () async {
-                              await _handlePostComment();
-                              if (context.mounted) Navigator.pop(context);
+                              final success = await _controller.postComment(
+                                context,
+                              );
+                              if (success && context.mounted) {
+                                Navigator.pop(context);
+                              }
                             }
                           : null,
-                      child: _isPostingComment
+                      child: _controller.isPostingComment
                           ? const SizedBox(
                               width: 16,
                               height: 16,
@@ -284,18 +201,18 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           : Text(
                               'Publicar',
                               style: TextStyle(
-                                color: hasText
+                                color: _controller.isComposing
                                     ? AppColors.upsYellow
                                     : Colors.white24,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                    );
-                  },
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
@@ -392,10 +309,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                             GestureDetector(
                               onTap: () => _showLikesModal(context),
                               child: StreamBuilder<DocumentSnapshot>(
-                                stream: FirebaseFirestore.instance
-                                    .collection('Posts')
-                                    .doc(widget.postId)
-                                    .snapshots(),
+                                stream: _controller.postStream,
                                 builder: (context, postSnapshot) {
                                   int likesCount = 0;
                                   if (postSnapshot.hasData &&
@@ -441,7 +355,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
                   // Lista de Comentarios en Tiempo Real
                   StreamBuilder<QuerySnapshot>(
-                    stream: _commentsStream,
+                    stream: _controller.commentsStream,
                     builder: (context, snapshot) {
                       if (snapshot.hasError) {
                         return const Padding(
@@ -492,8 +406,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                               data['com_authorUid'] as String? ?? '';
                           final commentId = docs[index].id;
                           final isOwner =
-                              _currentUserId != null &&
-                              _currentUserId == authorUid;
+                              _controller.currentUserId != null &&
+                              _controller.currentUserId == authorUid;
 
                           return ListTile(
                             contentPadding: const EdgeInsets.symmetric(
