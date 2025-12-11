@@ -6,8 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../theme/typography.dart';
 import '../../theme/colors.dart';
-import '../../widgets/effects/gradient_background.dart';
-import '../../widgets/buttons/primary_button.dart';
+
+import '../../widgets/design_system/glam_button.dart';
 import '../../widgets/filters/filter_preview_bubble.dart';
 import '../../widgets/dialogs/error_dialog.dart';
 import '../../../services/image/temp_image_service.dart';
@@ -15,10 +15,7 @@ import '../../../services/image/image_processing_service.dart';
 import '../../../services/posts/post_service.dart';
 
 class NewPostScreen extends StatefulWidget {
-  const NewPostScreen({
-    super.key,
-    this.autoLoadTempImage = false,
-  });
+  const NewPostScreen({super.key, this.autoLoadTempImage = false});
 
   /// Si viene desde el botón de cámara del feed, cargamos la imagen temporal.
   final bool autoLoadTempImage;
@@ -37,6 +34,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
   File? _originalImage;
   Uint8List? _originalImageBytes;
   Uint8List? _processedImage;
+
   /// Guarda el "key" interno del filtro seleccionado (ej: 'canny').
   String? _selectedFilter;
   bool _isProcessing = false;
@@ -46,14 +44,49 @@ class _NewPostScreenState extends State<NewPostScreen> {
 
   // Definición de filtros disponibles
   final List<Map<String, dynamic>> _filters = [
-    {'key': 'original', 'label': 'Original', 'icon': Icons.image, 'hasParams': false},
-    {'key': 'canny', 'label': 'Detección de Bordes', 'icon': Icons.auto_fix_high, 'hasParams': true},
-    {'key': 'gaussian', 'label': 'Desenfoque', 'icon': Icons.blur_on, 'hasParams': true},
-    {'key': 'negative', 'label': 'Invertir Colores', 'icon': Icons.invert_colors, 'hasParams': false},
-    {'key': 'emboss', 'label': 'Grabado en Relieve', 'icon': Icons.texture, 'hasParams': true},
-    {'key': 'watermark', 'label': 'Sellado UPS', 'icon': Icons.water_drop, 'hasParams': true},
+    {
+      'key': 'original',
+      'label': 'Original',
+      'icon': Icons.image,
+      'hasParams': false,
+    },
+    {
+      'key': 'canny',
+      'label': 'Detección de Bordes',
+      'icon': Icons.auto_fix_high,
+      'hasParams': true,
+    },
+    {
+      'key': 'gaussian',
+      'label': 'Desenfoque',
+      'icon': Icons.blur_on,
+      'hasParams': true,
+    },
+    {
+      'key': 'negative',
+      'label': 'Invertir Colores',
+      'icon': Icons.invert_colors,
+      'hasParams': false,
+    },
+    {
+      'key': 'emboss',
+      'label': 'Grabado en Relieve',
+      'icon': Icons.texture,
+      'hasParams': true,
+    },
+    {
+      'key': 'watermark',
+      'label': 'Sellado UPS',
+      'icon': Icons.water_drop,
+      'hasParams': true,
+    },
     {'key': 'ripple', 'label': 'Cómic', 'icon': Icons.waves, 'hasParams': true},
-    {'key': 'collage', 'label': 'Collage', 'icon': Icons.grid_view, 'hasParams': false},
+    {
+      'key': 'collage',
+      'label': 'Collage',
+      'icon': Icons.grid_view,
+      'hasParams': false,
+    },
   ];
 
   // Frases predeterminadas para descripción
@@ -71,14 +104,14 @@ class _NewPostScreenState extends State<NewPostScreen> {
   @override
   void initState() {
     super.initState();
-    
+
     // Escuchar cambios en el foco del campo de texto
     _captionFocusNode.addListener(() {
       setState(() {
         _isKeyboardVisible = _captionFocusNode.hasFocus;
       });
     });
-    
+
     // Verificar si hay una imagen temporal (desde el feed con cámara)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(milliseconds: 300), () async {
@@ -135,7 +168,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
     final source = await showDialog<ImageSource>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.upsBlueDark,
+        backgroundColor: AppColors.darkBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'Seleccionar imagen',
@@ -233,13 +266,14 @@ class _NewPostScreenState extends State<NewPostScreen> {
     try {
       final imageBytes = await file.readAsBytes();
       final tempFile = await TempImageService.saveOriginalImage(file);
-      
+
       if (tempFile != null && mounted) {
         setState(() {
           _originalImage = tempFile;
           _originalImageBytes = imageBytes;
           _processedImage = null;
-          _selectedFilter = 'original'; // Establecer "Original" como filtro por defecto
+          _selectedFilter =
+              'original'; // Establecer "Original" como filtro por defecto
         });
         // Aplicar filtro "Original" automáticamente
         _applyFilter('original');
@@ -250,7 +284,8 @@ class _NewPostScreenState extends State<NewPostScreen> {
           await ErrorDialog.show(
             context,
             title: 'Error',
-            message: 'Error al guardar la imagen. Por favor, intenta nuevamente.',
+            message:
+                'Error al guardar la imagen. Por favor, intenta nuevamente.',
           );
         }
       }
@@ -312,7 +347,10 @@ class _NewPostScreenState extends State<NewPostScreen> {
   }
 
   /// Aplica un filtro sobre la imagen original
-  Future<void> _applyFilter(String filterName, {Map<String, dynamic>? params}) async {
+  Future<void> _applyFilter(
+    String filterName, {
+    Map<String, dynamic>? params,
+  }) async {
     if (_originalImage == null) return;
 
     setState(() {
@@ -383,7 +421,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
       }
 
       if (!mounted) return;
-      
+
       setState(() {
         _processedImage = result;
         _selectedFilter = filterName;
@@ -409,7 +447,13 @@ class _NewPostScreenState extends State<NewPostScreen> {
 
     switch (filterName.toLowerCase()) {
       case 'canny':
-        autoParams = {'kernel_size': 5, 'sigma': 2, 'low_threshold': '0', 'high_threshold': '0', 'use_auto': true};
+        autoParams = {
+          'kernel_size': 5,
+          'sigma': 2,
+          'low_threshold': '0',
+          'high_threshold': '0',
+          'use_auto': true,
+        };
         break;
       case 'gaussian':
         autoParams = {'kernel_size': 15, 'sigma': 5, 'use_auto': true};
@@ -418,10 +462,20 @@ class _NewPostScreenState extends State<NewPostScreen> {
         autoParams = {'kernel_size': 3, 'bias_value': 128, 'use_auto': true};
         break;
       case 'watermark':
-        autoParams = {'scale': 0.3, 'transparency': 0.3, 'spacing': 0.5, 'use_auto': true};
+        autoParams = {
+          'scale': 0.3,
+          'transparency': 0.3,
+          'spacing': 0.5,
+          'use_auto': true,
+        };
         break;
       case 'ripple':
-        autoParams = {'edge_threshold': 100, 'color_levels': 8, 'saturation': 1.2, 'use_auto': true};
+        autoParams = {
+          'edge_threshold': 100,
+          'color_levels': 8,
+          'saturation': 1.2,
+          'use_auto': true,
+        };
         break;
     }
 
@@ -480,7 +534,8 @@ class _NewPostScreenState extends State<NewPostScreen> {
       File imageToSend;
       if (_processedImage != null) {
         final tempDir = await getTemporaryDirectory();
-        final processedPath = '${tempDir.path}/processed_post_${DateTime.now().millisecondsSinceEpoch}.png';
+        final processedPath =
+            '${tempDir.path}/processed_post_${DateTime.now().millisecondsSinceEpoch}.png';
         final processedFile = File(processedPath);
         await processedFile.writeAsBytes(_processedImage!);
         imageToSend = processedFile;
@@ -491,7 +546,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
       await PostService.createPost(imageToSend, caption);
 
       await TempImageService.clearTempImage();
-      
+
       if (_processedImage != null && imageToSend.existsSync()) {
         await imageToSend.delete();
       }
@@ -507,7 +562,8 @@ class _NewPostScreenState extends State<NewPostScreen> {
         await ErrorDialog.show(
           context,
           title: 'Error al publicar',
-          message: 'Ocurrió un error al intentar publicar tu post: ${e.toString()}',
+          message:
+              'Ocurrió un error al intentar publicar tu post: ${e.toString()}',
         );
       }
     }
@@ -539,12 +595,13 @@ class _NewPostScreenState extends State<NewPostScreen> {
             children: [
               // HEADER con indicador de paso
               _buildHeader(),
-              
+
               // CONTENIDO PRINCIPAL - PageView
               Expanded(
                 child: PageView(
                   controller: _pageController,
-                  physics: const NeverScrollableScrollPhysics(), // Deshabilitar swipe manual
+                  physics:
+                      const NeverScrollableScrollPhysics(), // Deshabilitar swipe manual
                   onPageChanged: (index) {
                     setState(() {
                       _currentStep = index;
@@ -620,17 +677,14 @@ class _NewPostScreenState extends State<NewPostScreen> {
                   : _buildEmptyImageArea(),
             ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Botones
           if (_originalImage != null) ...[
-            PrimaryButton(
-              label: 'Siguiente',
-              onPressed: _nextStep,
-            ),
+            GlamButton(label: 'Siguiente', onPressed: _nextStep),
           ] else ...[
-            PrimaryButton(
+            GlamButton(
               label: 'Seleccionar imagen',
               onPressed: () => _pickImage(ImageSource.gallery),
             ),
@@ -669,7 +723,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
             child: _buildLargeImagePreview(),
           ),
         ),
-        
+
         // Burbujas de filtros
         Expanded(
           flex: 2,
@@ -678,10 +732,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
             children: [
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 24),
-                child: Text(
-                  'Filtros',
-                  style: AppTypography.body,
-                ),
+                child: Text('Filtros', style: AppTypography.body),
               ),
               const SizedBox(height: 12),
               Expanded(
@@ -696,7 +747,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
                     final isSelected = _selectedFilter == null
                         ? filterKey == 'original'
                         : _selectedFilter == filterKey;
-                    
+
                     return Padding(
                       padding: const EdgeInsets.only(right: 16),
                       child: FilterPreviewBubble(
@@ -715,25 +766,22 @@ class _NewPostScreenState extends State<NewPostScreen> {
             ],
           ),
         ),
-        
+
         // Botones de navegación
         Padding(
           padding: const EdgeInsets.all(24),
           child: Row(
             children: [
               Expanded(
-                child: PrimaryButton(
+                child: GlamButton(
                   label: 'Atrás',
-                  variant: ButtonVariant.ghost,
+                  isGhost: true,
                   onPressed: _previousStep,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: PrimaryButton(
-                  label: 'Siguiente',
-                  onPressed: _nextStep,
-                ),
+                child: GlamButton(label: 'Siguiente', onPressed: _nextStep),
               ),
             ],
           ),
@@ -749,12 +797,9 @@ class _NewPostScreenState extends State<NewPostScreen> {
       child: Column(
         children: [
           const SizedBox(height: 20),
-          
+
           // Campo de descripción
-          const Text(
-            'Descripción',
-            style: AppTypography.body,
-          ),
+          const Text('Descripción', style: AppTypography.body),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -776,16 +821,13 @@ class _NewPostScreenState extends State<NewPostScreen> {
               ),
             ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Frases predeterminadas
-          const Text(
-            'Sugerencias',
-            style: AppTypography.body,
-          ),
+          const Text('Sugerencias', style: AppTypography.body),
           const SizedBox(height: 12),
-          
+
           // Grid de frases sugeridas
           Expanded(
             child: SingleChildScrollView(
@@ -826,22 +868,22 @@ class _NewPostScreenState extends State<NewPostScreen> {
               ),
             ),
           ),
-          
+
           // Botones de navegación (ocultos cuando el teclado está visible)
           if (!_isKeyboardVisible) ...[
             const SizedBox(height: 24),
             Row(
               children: [
                 Expanded(
-                  child: PrimaryButton(
+                  child: GlamButton(
                     label: 'Atrás',
-                    variant: ButtonVariant.ghost,
+                    isGhost: true,
                     onPressed: _previousStep,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: PrimaryButton(
+                  child: GlamButton(
                     label: _isPublishing ? 'Publicando...' : 'Publicar',
                     isLoading: _isPublishing,
                     isDisabled: _isPublishing || _isProcessing,
@@ -879,10 +921,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
               SizedBox(height: 12),
               Text(
                 'Toca para seleccionar imagen',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
-                ),
+                style: TextStyle(color: Colors.white70, fontSize: 16),
               ),
             ],
           ),
@@ -901,10 +940,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
-        child: Image.memory(
-          imageBytes,
-          fit: BoxFit.cover,
-        ),
+        child: Image.memory(imageBytes, fit: BoxFit.cover),
       ),
     );
   }
@@ -954,10 +990,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
-        child: Image.memory(
-          imageToShow,
-          fit: BoxFit.contain,
-        ),
+        child: Image.memory(imageToShow, fit: BoxFit.contain),
       ),
     );
   }

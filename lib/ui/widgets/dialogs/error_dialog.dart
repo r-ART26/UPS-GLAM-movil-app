@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../theme/colors.dart';
 
 /// Widget de diálogo para mostrar errores de forma elegante y consistente.
-/// 
+///
 /// Características:
 /// - Diseño moderno y bonito
 /// - Botón de aceptar para cerrar
@@ -12,11 +12,7 @@ class ErrorDialog extends StatelessWidget {
   final String title;
   final String message;
 
-  const ErrorDialog({
-    super.key,
-    required this.title,
-    required this.message,
-  });
+  const ErrorDialog({super.key, required this.title, required this.message});
 
   /// Muestra el diálogo de error de forma estática desde cualquier contexto
   static Future<void> show(
@@ -29,10 +25,7 @@ class ErrorDialog extends StatelessWidget {
       barrierDismissible: false,
       barrierColor: Colors.black.withOpacity(0.6),
       builder: (BuildContext dialogContext) {
-        return ErrorDialog(
-          title: title ?? 'Error',
-          message: message,
-        );
+        return ErrorDialog(title: title ?? 'Error', message: message);
       },
     );
   }
@@ -72,8 +65,8 @@ class ErrorDialog extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppColors.upsBlueDark,
-              AppColors.upsBlueDark.withOpacity(0.95),
+              AppColors.darkBackground,
+              AppColors.darkBackground.withOpacity(0.95),
             ],
           ),
           borderRadius: BorderRadius.circular(24),
@@ -90,10 +83,7 @@ class ErrorDialog extends StatelessWidget {
               offset: const Offset(0, 5),
             ),
           ],
-          border: Border.all(
-            color: Colors.white.withOpacity(0.1),
-            width: 1,
-          ),
+          border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -252,4 +242,3 @@ class ErrorDialog extends StatelessWidget {
     );
   }
 }
-

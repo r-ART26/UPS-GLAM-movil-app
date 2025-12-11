@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../theme/colors.dart';
 
 /// Widget de diálogo para confirmaciones de forma elegante y consistente.
-/// 
+///
 /// Características:
 /// - Diseño moderno y bonito
 /// - Botones de cancelar y confirmar
@@ -86,8 +86,8 @@ class ConfirmDialog extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppColors.upsBlueDark,
-              AppColors.upsBlueDark.withOpacity(0.95),
+              AppColors.darkBackground,
+              AppColors.darkBackground.withOpacity(0.95),
             ],
           ),
           borderRadius: BorderRadius.circular(24),
@@ -104,10 +104,7 @@ class ConfirmDialog extends StatelessWidget {
               offset: const Offset(0, 5),
             ),
           ],
-          border: Border.all(
-            color: Colors.white.withOpacity(0.1),
-            width: 1,
-          ),
+          border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -306,4 +303,3 @@ class ConfirmDialog extends StatelessWidget {
     );
   }
 }
-

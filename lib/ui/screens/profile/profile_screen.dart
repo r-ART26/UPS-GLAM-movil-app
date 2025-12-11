@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../theme/typography.dart';
 import '../../theme/colors.dart';
-import '../../widgets/effects/gradient_background.dart';
+
 import '../../widgets/follow_button.dart';
 import '../../widgets/user_list_item.dart';
 import '../../../services/subscriptions/subscription_service.dart';
@@ -11,6 +11,8 @@ import '../post/post_detail_screen.dart';
 import 'edit_profile_screen.dart';
 import '../../widgets/full_screen_image_viewer.dart';
 import 'profile_controller.dart';
+
+import '../../widgets/design_system/glam_button.dart'; // For GlamButton usage if needed
 
 class ProfileScreen extends StatefulWidget {
   final String? userId; // Si es null, es MI perfil
@@ -41,7 +43,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(gradient: AppGradients.welcomeBackground),
+      decoration: const BoxDecoration(gradient: AppGradients.darkBackground),
       child: SafeArea(
         child: AnimatedBuilder(
           animation: _controller,
@@ -75,10 +77,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
-            children: const [
-              Text('UPS', style: AppTypography.titleUPS),
-              SizedBox(width: 4),
-              Text('tagram', style: AppTypography.titleGlam),
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              const Text('UPS', style: AppTypography.titleUPS),
+              const SizedBox(width: 4),
+              ShaderMask(
+                shaderCallback: (bounds) =>
+                    AppGradients.gold.createShader(bounds),
+                child: const Text('tagram', style: AppTypography.titleGlam),
+              ),
             ],
           ),
           // Solo mostrar configuración si es MI perfil
@@ -142,22 +150,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 12),
 
           // Nombre
-          Text(
-            user.username,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          Text(user.username, style: AppTypography.h2),
 
           const SizedBox(height: 4),
 
           // Email
-          Text(
-            user.email,
-            style: const TextStyle(color: Colors.white70, fontSize: 14),
-          ),
+          Text(user.email, style: AppTypography.bodySmall),
 
           const SizedBox(height: 20),
 
@@ -229,10 +227,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             bio,
             maxLines: 4,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.upsBlueDark,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+            style: AppTypography.caption.copyWith(
+              color: AppColors.upsBlue,
+              fontWeight: FontWeight.w700,
               height: 1.2,
             ),
           ),
@@ -329,7 +326,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          backgroundColor: AppColors.upsBlueDark,
+          backgroundColor: AppColors.darkBackground,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -414,7 +411,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: AppColors.upsBlueDark,
+              color: AppColors.darkBackground,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
@@ -639,7 +636,7 @@ class _UsersListBottomSheet extends StatelessWidget {
     return Container(
       height: MediaQuery.of(context).size.height * 0.7,
       decoration: BoxDecoration(
-        color: AppColors.upsBlueDark,
+        color: AppColors.darkBackground,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(

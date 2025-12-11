@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../theme/colors.dart';
-import '../../widgets/effects/gradient_background.dart';
+import '../../widgets/design_system/glam_input.dart';
+
 import '../../../services/users/user_search_service.dart';
 import '../../../services/posts/random_posts_service.dart';
 import '../../../models/user_model.dart';
@@ -18,14 +19,12 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
-  final FocusNode _searchFocusNode = FocusNode();
   Timer? _debounceTimer;
   String _currentQuery = '';
 
   @override
   void dispose() {
     _searchController.dispose();
-    _searchFocusNode.dispose();
     _debounceTimer?.cancel();
     super.dispose();
   }
@@ -44,52 +43,34 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(gradient: AppGradients.welcomeBackground),
+      decoration: const BoxDecoration(gradient: AppGradients.darkBackground),
       child: SafeArea(
         child: Column(
           children: [
-            // Barra de búsqueda
+            // Barra de búsqueda con GlamInput
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.3),
-                    width: 1,
-                  ),
-                ),
-                child: TextField(
-                  controller: _searchController,
-                  focusNode: _searchFocusNode,
-                  onChanged: _onSearchChanged,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Buscar usuarios...',
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
-                    prefixIcon: const Icon(Icons.search, color: Colors.white70),
-                    suffixIcon: _currentQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(
-                              Icons.clear,
-                              color: Colors.white70,
-                            ),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {
-                                _currentQuery = '';
-                              });
-                            },
-                          )
-                        : null,
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                  ),
-                ),
+              child: GlamInput(
+                label: '', // Sin etiqueta superior para búsqueda
+                hintText: 'Buscar usuarios...',
+                controller: _searchController,
+                prefixIcon: Icons.search,
+                onChanged: _onSearchChanged,
+                suffix: _currentQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(
+                          Icons.clear,
+                          color: Colors.white70,
+                          size: 20,
+                        ),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {
+                            _currentQuery = '';
+                          });
+                        },
+                      )
+                    : null,
               ),
             ),
 
@@ -199,7 +180,7 @@ class _SearchScreenState extends State<SearchScreen> {
   /// Construye el overlay de resultados de búsqueda
   Widget _buildSearchResults() {
     return Container(
-      color: AppColors.upsBlueDark.withOpacity(0.95),
+      color: AppColors.darkBackground.withOpacity(0.95),
       child: StreamBuilder<List<UserModel>>(
         stream: UserSearchService.searchUsersStream(_currentQuery),
         builder: (context, snapshot) {

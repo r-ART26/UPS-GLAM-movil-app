@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Para tipos de datos si es necesario (ej DocumentSnapshot implícitos)
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../theme/typography.dart';
 import '../../theme/colors.dart';
-import '../../widgets/effects/gradient_background.dart';
+
 import '../../widgets/like_button.dart';
 import '../post/post_detail_screen.dart';
 import 'feed_controller.dart';
 import '../../../models/feed_post_model.dart';
+import '../../widgets/design_system/glam_button.dart';
 
 /// Pantalla principal (Feed) con arquitectura separada (MVC) y Paginación.
 class FeedScreen extends StatefulWidget {
@@ -50,42 +51,55 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(gradient: AppGradients.welcomeBackground),
+      decoration: const BoxDecoration(gradient: AppGradients.darkBackground),
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             /// HEADER SUPERIOR
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: const [
+                mainAxisAlignment:
+                    MainAxisAlignment.spaceBetween, // Separar logo y acciones
+                children: [
                   // Marca UPStagram
-                  Text('UPS', style: AppTypography.titleUPS),
-                  SizedBox(width: 4),
-                  Text('tagram', style: AppTypography.titleGlam),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      const Text('UPS', style: AppTypography.titleUPS),
+                      const SizedBox(width: 4),
+                      ShaderMask(
+                        shaderCallback: (bounds) =>
+                            AppGradients.gold.createShader(bounds),
+                        child: const Text(
+                          'tagram',
+                          style: AppTypography.titleGlam,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Botón de notificaciones (placeholder por ahora)
+                  IconButton(
+                    onPressed: () {}, // TODO: Implementar notificaciones
+                    icon: Icon(
+                      Icons.notifications_outlined,
+                      color: Colors.white70,
+                    ),
+                    splashRadius: 24,
+                  ),
                 ],
               ),
             ),
-
-            /// SUBTÍTULO
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                'Explora las fotos de la comunidad UPS',
-                style: AppTypography.body,
-              ),
-            ),
-
-            const SizedBox(height: 12),
 
             /// LISTA DE POSTS (CON PULL-TO-REFRESH Y PAGINACIÓN)
             Expanded(
               child: RefreshIndicator(
                 onRefresh: _controller.refresh,
-                color: AppColors.upsBlue,
-                backgroundColor: Colors.white,
+                color: AppColors.upsYellow,
+                backgroundColor: AppColors.darkBackground,
                 child: _buildBody(),
               ),
             ),
@@ -99,7 +113,7 @@ class _FeedScreenState extends State<FeedScreen> {
     // 1. Cargando inicial (solo si la lista está vacía)
     if (_controller.isLoading && _controller.posts.isEmpty) {
       return const Center(
-        child: CircularProgressIndicator(color: Colors.white),
+        child: CircularProgressIndicator(color: AppColors.upsYellow),
       );
     }
 
@@ -109,12 +123,21 @@ class _FeedScreenState extends State<FeedScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         child: SizedBox(
           height: MediaQuery.of(context).size.height * 0.5,
-          child: const Center(
-            child: Text(
-              'No hay publicaciones aún.\n¡Sé el primero en postear!',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white70),
-            ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.photo_library_outlined,
+                size: 64,
+                color: Colors.white24,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'No hay publicaciones aún.\n¡Sé el primero en postear!',
+                textAlign: TextAlign.center,
+                style: AppTypography.body,
+              ),
+            ],
           ),
         ),
       );
@@ -123,8 +146,7 @@ class _FeedScreenState extends State<FeedScreen> {
     // 3. Lista con datos
     return ListView.builder(
       controller: _scrollController,
-      physics:
-          const AlwaysScrollableScrollPhysics(), // Permite refresh incluso con pocos items
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       itemCount: _controller.posts.length + 1, // +1 para el loader final
       itemBuilder: (context, index) {
@@ -134,16 +156,20 @@ class _FeedScreenState extends State<FeedScreen> {
         } else {
           // Loader final de paginación
           return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20),
+            padding: const EdgeInsets.symmetric(vertical: 24),
             child: Center(
               child: _controller.hasMore
-                  ? const CircularProgressIndicator(
-                      color: Colors.white54,
-                      strokeWidth: 2,
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: Colors.white24,
+                        strokeWidth: 2,
+                      ),
                     )
                   : const Text(
                       "Has llegado al final",
-                      style: TextStyle(color: Colors.white30),
+                      style: TextStyle(color: Colors.white24, fontSize: 12),
                     ),
             ),
           );
@@ -167,45 +193,76 @@ class _FeedScreenState extends State<FeedScreen> {
         );
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
+        margin: const EdgeInsets.only(bottom: 24),
         decoration: BoxDecoration(
-          color: Colors.white.withAlpha(25),
-          borderRadius: BorderRadius.circular(18),
+          color: AppColors.glassWhite, // Glassmorphism base
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.glassBorder),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Header del Post (Usuario)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      GoRouter.of(context).push('/profile/${post.authorUid}');
+                    },
+                    child: _UserNameFetcher(uid: post.authorUid),
+                  ),
+                  Text(
+                    post.timeAgo,
+                    style: AppTypography.caption.copyWith(
+                      color: Colors.white54,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             // Imagen del post
             Hero(
               tag: post.id,
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(18),
-                ),
-                child: AspectRatio(
-                  aspectRatio: 4 / 3,
-                  child: Image.network(
-                    post.imageUrl,
-                    fit: BoxFit.cover,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return ColoredBox(
-                        color: Colors.black12,
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            value: loadingProgress.expectedTotalBytes != null
-                                ? loadingProgress.cumulativeBytesLoaded /
-                                      loadingProgress.expectedTotalBytes!
-                                : null,
-                            color: Colors.white24,
-                          ),
+              child: AspectRatio(
+                aspectRatio: 4 / 3, // Standard social media aspect ratio
+                child: Image.network(
+                  post.imageUrl,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      color: Colors.white.withOpacity(0.05),
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
+                              : null,
+                          color: AppColors.upsYellow,
+                          strokeWidth: 2,
                         ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      color: Colors.grey[800],
-                      child: const Center(
-                        child: Icon(Icons.broken_image, color: Colors.white54),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    color: Colors.grey[900],
+                    child: const Center(
+                      child: Icon(
+                        Icons.broken_image_rounded,
+                        color: Colors.white24,
+                        size: 48,
                       ),
                     ),
                   ),
@@ -213,59 +270,28 @@ class _FeedScreenState extends State<FeedScreen> {
               ),
             ),
 
-            // Contenido textual
+            // Acciones y Contenido
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Usuario + fecha
+                  // Barra de Acciones
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Nombre dinámico desde Firebase 'Users'
-                      GestureDetector(
-                        onTap: () {
-                          GoRouter.of(
-                            context,
-                          ).push('/profile/${post.authorUid}');
-                        },
-                        behavior: HitTestBehavior.opaque,
-                        child: _UserNameFetcher(uid: post.authorUid),
-                      ),
-
-                      Text(
-                        post.timeAgo,
-                        style: const TextStyle(
-                          color: Colors.white60,
-                          fontSize: 12,
+                      LikeButton(
+                        postId: post.id,
+                        initialLikesCount: post.likesCount,
+                        iconSize: 26,
+                        likedColor: AppColors.upsYellow, // Gold heart
+                        unlikedColor: Colors.white70,
+                        countStyle: AppTypography.body.copyWith(
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 6),
-
-                  // Descripción
-                  if (post.caption.isNotEmpty)
-                    Text(
-                      post.caption,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
-                    ),
-
-                  const SizedBox(height: 8),
-
-                  // Barra de Acciones: Comentarios y Likes
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // --- COMENTARIOS (Interactivo) ---
+                      const SizedBox(width: 20),
                       GestureDetector(
                         onTap: () {
-                          // Navegar a la pantalla de detalle del post
                           Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (context) => PostDetailScreen(
@@ -277,47 +303,38 @@ class _FeedScreenState extends State<FeedScreen> {
                             ),
                           );
                         },
-                        behavior: HitTestBehavior.opaque,
                         child: Row(
                           children: [
                             const Icon(
-                              Icons.chat_bubble_outline,
+                              Icons.chat_bubble_outline_rounded,
                               color: Colors.white70,
-                              size: 22,
+                              size: 24,
                             ),
                             const SizedBox(width: 6),
-                            // Mantenemos Stream local solo para el contador en tiempo real si se desea,
-                            // o usamos el valor estático del modelo para eficiencia.
-                            // El usuario pidió separar lógica, así que usar el modelo es más "limpio".
-                            // Si se quiere realtime estricto en contadores, se debe mantener el Stream.
-                            // Por ahora usaremos el valor del modelo para cumplir con la optimización de recursos.
                             Text(
                               '${post.commentsCount}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
+                              style: AppTypography.body.copyWith(
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],
                         ),
                       ),
-
-                      // --- LIKES (Interactivo con animación) ---
-                      LikeButton(
-                        postId: post.id,
-                        initialLikesCount: post.likesCount,
-                        iconSize: 22,
-                        likedColor: Colors.redAccent,
-                        unlikedColor: Colors.white70,
-                        countStyle: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
                     ],
                   ),
+
+                  if (post.caption.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      post.caption,
+                      style: AppTypography.body.copyWith(
+                        color: Colors.white.withOpacity(0.9),
+                        height: 1.4,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -329,7 +346,6 @@ class _FeedScreenState extends State<FeedScreen> {
 }
 
 /// Widget pequeño para cargar el nombre de usuario bajo demanda
-/// (Podría moverse a un archivo aparte, pero se mantiene aquí por ahora como componente de UI puro)
 class _UserNameFetcher extends StatelessWidget {
   final String uid;
 
@@ -337,57 +353,17 @@ class _UserNameFetcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Si no hay UID válido
     if (uid.isEmpty) {
-      return Row(
-        children: const [
-          CircleAvatar(
-            radius: 14,
-            backgroundColor: Colors.grey,
-            child: Icon(Icons.person, size: 16, color: Colors.white),
-          ),
-          SizedBox(width: 8),
-          Text(
-            'Usuario UPS',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-            ),
-          ),
-        ],
-      );
+      return _buildUserRow('Usuario UPS', null);
     }
 
     return FutureBuilder<DocumentSnapshot>(
       future: FirebaseFirestore.instance.collection('Users').doc(uid).get(),
       builder: (context, snapshot) {
-        // 1. Cargando
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Row(
-            children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: const BoxDecoration(
-                  color: Colors.white10,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                width: 80,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: Colors.white10,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ],
-          );
+          return _buildLoadingState();
         }
 
-        // 2. Extraer datos
         String name = 'Usuario UPS';
         String? photoUrl;
 
@@ -399,41 +375,75 @@ class _UserNameFetcher extends StatelessWidget {
           photoUrl = data?['usr_photoUrl'] as String?;
         }
 
-        // 3. Lógica de Avatar
-        ImageProvider? avatarImage;
-        if (photoUrl != null && photoUrl.isNotEmpty) {
-          avatarImage = NetworkImage(photoUrl);
-        } else {
-          // Generar avatar con iniciales si no hay foto
-          final safeName = Uri.encodeComponent(name);
-          avatarImage = NetworkImage(
-            'https://ui-avatars.com/api/?name=$safeName&background=003F87&color=fff&size=150&bold=true',
-          );
-        }
-
-        return Row(
-          children: [
-            // Avatar
-            CircleAvatar(
-              radius: 14,
-              backgroundColor: AppColors.upsBlue,
-              backgroundImage: avatarImage,
-            ),
-
-            const SizedBox(width: 8),
-
-            // Nombre
-            Text(
-              name,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
-            ),
-          ],
-        );
+        return _buildUserRow(name, photoUrl);
       },
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Row(
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Container(
+          width: 100,
+          height: 14,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUserRow(String name, String? photoUrl) {
+    ImageProvider avatarImage;
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      avatarImage = NetworkImage(photoUrl);
+    } else {
+      final safeName = Uri.encodeComponent(name);
+      avatarImage = NetworkImage(
+        'https://ui-avatars.com/api/?name=$safeName&background=003F87&color=fff&size=150&bold=true',
+      );
+    }
+
+    return Row(
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.glassBorder, width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: CircleAvatar(
+            radius: 18,
+            backgroundColor: AppColors.upsBlue,
+            backgroundImage: avatarImage,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          name,
+          style: AppTypography.body.copyWith(
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2, // Slightly wider for headings
+          ),
+        ),
+      ],
     );
   }
 }
