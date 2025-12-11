@@ -12,6 +12,7 @@ import '../../../services/subscriptions/subscription_service.dart';
 import '../../../models/user_model.dart';
 import '../post/post_detail_screen.dart';
 import 'edit_profile_screen.dart';
+import '../../widgets/full_screen_image_viewer.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? userId; // Si es null, es MI perfil
@@ -397,16 +398,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      // Avatar
-                      CircleAvatar(
-                        radius: 46,
-                        backgroundColor: AppColors.upsBlue,
-                        backgroundImage:
-                            (_photoUrl != null && _photoUrl!.isNotEmpty)
-                            ? NetworkImage(_photoUrl!)
-                            : NetworkImage(
-                                'https://ui-avatars.com/api/?name=${Uri.encodeComponent(_userName ?? 'Usuario')}&background=003F87&color=fff&size=200&bold=true',
+                      // Avatar con Zoom
+                      GestureDetector(
+                        onTap: () {
+                          // Solo abrir si hay una URL real, o usar la generada también
+                          final imageToShow =
+                              (_photoUrl != null && _photoUrl!.isNotEmpty)
+                              ? _photoUrl!
+                              : 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(_userName ?? 'Usuario')}&background=003F87&color=fff&size=500&bold=true'; // Pedimos versión HD para el zoom
+
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => FullScreenImageViewer(
+                                imageUrl: imageToShow,
+                                heroTag:
+                                    'profile_avatar_${_currentUserId ?? 'unknown'}', // Tag único por si hay varios perfiles
                               ),
+                            ),
+                          );
+                        },
+                        child: Hero(
+                          tag: 'profile_avatar_${_currentUserId ?? 'unknown'}',
+                          child: CircleAvatar(
+                            radius: 46,
+                            backgroundColor: AppColors.upsBlue,
+                            backgroundImage:
+                                (_photoUrl != null && _photoUrl!.isNotEmpty)
+                                ? NetworkImage(_photoUrl!)
+                                : NetworkImage(
+                                    'https://ui-avatars.com/api/?name=${Uri.encodeComponent(_userName ?? 'Usuario')}&background=003F87&color=fff&size=200&bold=true',
+                                  ),
+                          ),
+                        ),
                       ),
 
                       // Bocadillo de Estado (Lateral Derecho)

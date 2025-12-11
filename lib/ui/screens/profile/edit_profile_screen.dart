@@ -21,7 +21,6 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-  late TextEditingController _nameController;
   late TextEditingController _bioController;
 
   File? _selectedImage;
@@ -31,13 +30,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.currentName);
     _bioController = TextEditingController(text: widget.currentBio);
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
     _bioController.dispose();
     super.dispose();
   }
@@ -180,17 +177,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             // ==================
             // FORMULARIO
             // ==================
-
-            // Campo Nombre (ReadOnly)
-            _buildTextField(
-              controller: _nameController,
-              label: 'Nombre',
-              icon: Icons.person_outline,
-              readOnly: true, // Nuevo: Campo solo lectura
-              helperText: 'El nombre de usuario no es editable.',
-            ),
-
-            const SizedBox(height: 24),
 
             // Campo Estado (Bio)
             _buildTextField(

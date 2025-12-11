@@ -7,6 +7,7 @@ import '../../widgets/dialogs/confirm_dialog.dart';
 import '../../widgets/like_button.dart';
 import '../../../services/posts/comment_service.dart';
 import '../../../services/auth/auth_service.dart';
+import '../../widgets/full_screen_image_viewer.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final String postId;
@@ -323,12 +324,26 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Imagen Hero (Animación suave desde el feed)
-                  Hero(
-                    tag: widget.postId,
-                    child: Image.network(
-                      widget.imageUrl,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
+                  // Imagen Hero (con Zoom)
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => FullScreenImageViewer(
+                            imageUrl: widget.imageUrl,
+                            heroTag: widget.postId,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Hero(
+                      tag: widget.postId,
+                      child: Image.network(
+                        widget.imageUrl,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   ),
 
