@@ -8,7 +8,7 @@ import '../../theme/typography.dart';
 import '../../theme/colors.dart';
 import '../../widgets/effects/gradient_background.dart';
 import '../../widgets/buttons/primary_button.dart';
-import '../../widgets/filters/filter_item.dart';
+import '../../widgets/filters/filter_preview_bubble.dart';
 import '../../widgets/filters/filter_params_panel.dart';
 import '../../widgets/dialogs/error_dialog.dart';
 import '../../../services/image/temp_image_service.dart';
@@ -25,15 +25,19 @@ class NewPostScreen extends StatefulWidget {
 class _NewPostScreenState extends State<NewPostScreen> {
   final ImagePicker _imagePicker = ImagePicker();
   final TextEditingController _captionController = TextEditingController();
+  final PageController _pageController = PageController();
+  final FocusNode _captionFocusNode = FocusNode();
 
+  // Estado compartido entre páginas
   File? _originalImage;
-  Uint8List? _originalImageBytes; // Bytes de la imagen original para mostrar
+  Uint8List? _originalImageBytes;
   Uint8List? _processedImage;
-  String? _currentFilter;
+  String? _selectedFilter;
   Map<String, dynamic> _filterParams = {};
   bool _isProcessing = false;
   bool _isPublishing = false;
-  bool _showParamsPanel = false;
+  int _currentStep = 0;
+  bool _isKeyboardVisible = false;
 
   // Definición de filtros disponibles
   final List<Map<String, dynamic>> _filters = [
@@ -47,14 +51,48 @@ class _NewPostScreenState extends State<NewPostScreen> {
     {'name': 'Collage', 'icon': Icons.grid_view, 'hasParams': false},
   ];
 
+  // Frases predeterminadas para descripción
+  final List<String> _suggestedCaptions = [
+    '¡Día increíble! ☀️',
+    'Momentos especiales 💫',
+    'Vida universitaria 📚',
+    'Comunidad UPS 🎓',
+    'Aventuras nuevas 🚀',
+    'Recuerdos para siempre 📸',
+    'Feliz y agradecido ❤️',
+    'Día perfecto ✨',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-abrir image picker después de un pequeño delay
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) {
+          _showImageSourceDialog();
+        }
+      });
+    });
+    
+    // Escuchar cambios en el foco del campo de texto
+    _captionFocusNode.addListener(() {
+      setState(() {
+        _isKeyboardVisible = _captionFocusNode.hasFocus;
+      });
+    });
+  }
+
   @override
   void dispose() {
     _captionController.dispose();
+    _captionFocusNode.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
-  /// Muestra diálogo para seleccionar imagen desde cámara o galería
-  Future<void> _selectImage() async {
+  /// Muestra diálogo para seleccionar fuente de imagen
+  Future<void> _showImageSourceDialog() async {
     final source = await showDialog<ImageSource>(
       context: context,
       builder: (context) => AlertDialog(
@@ -88,39 +126,57 @@ class _NewPostScreenState extends State<NewPostScreen> {
       ),
     );
 
-    if (source == null) return;
+    if (source == null) {
+      // Si se cancela, mostrar opción de cámara directamente
+      _openCamera();
+      return;
+    }
 
+    await _pickImage(source);
+  }
+
+  /// Abre la cámara con cámara trasera por defecto
+  Future<void> _openCamera() async {
     try {
       final XFile? pickedFile = await _imagePicker.pickImage(
-        source: source,
+        source: ImageSource.camera,
         imageQuality: 85,
+        preferredCameraDevice: CameraDevice.rear,
       );
 
       if (pickedFile != null) {
-        final file = File(pickedFile.path);
-        
-        // Leer bytes de la imagen para mostrar inmediatamente
-        final imageBytes = await file.readAsBytes();
-        
-        // Guardar imagen original temporalmente
-        final tempFile = await TempImageService.saveOriginalImage(file);
-        if (tempFile != null) {
-          setState(() {
-            _originalImage = tempFile;
-            _originalImageBytes = imageBytes; // Actualizar bytes para mostrar
-            _processedImage = null;
-            _currentFilter = null;
-            _showParamsPanel = false;
-          });
-        } else {
-          if (mounted) {
-            await ErrorDialog.show(
-              context,
-              title: 'Error',
-              message: 'Error al guardar la imagen. Por favor, intenta nuevamente.',
-            );
-          }
-        }
+        await _processPickedImage(File(pickedFile.path));
+      }
+    } catch (e) {
+      if (mounted) {
+        await ErrorDialog.show(
+          context,
+          title: 'Error al abrir cámara',
+          message: 'Ocurrió un error al abrir la cámara: ${e.toString()}',
+        );
+      }
+    }
+  }
+
+  /// Selecciona imagen desde la fuente especificada
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? pickedFile;
+      if (source == ImageSource.camera) {
+        pickedFile = await _imagePicker.pickImage(
+          source: source,
+          imageQuality: 85,
+          preferredCameraDevice: CameraDevice.rear,
+        );
+      } else {
+        pickedFile = await _imagePicker.pickImage(
+          source: source,
+          imageQuality: 85,
+        );
+      }
+
+      if (pickedFile != null) {
+        await _processPickedImage(File(pickedFile.path));
       }
     } catch (e) {
       if (mounted) {
@@ -130,6 +186,71 @@ class _NewPostScreenState extends State<NewPostScreen> {
           message: 'Ocurrió un error al seleccionar la imagen: ${e.toString()}',
         );
       }
+    }
+  }
+
+  /// Procesa la imagen seleccionada
+  Future<void> _processPickedImage(File file) async {
+    try {
+      final imageBytes = await file.readAsBytes();
+      final tempFile = await TempImageService.saveOriginalImage(file);
+      
+      if (tempFile != null && mounted) {
+        setState(() {
+          _originalImage = tempFile;
+          _originalImageBytes = imageBytes;
+          _processedImage = null;
+          _selectedFilter = 'Original'; // Establecer "Original" como filtro por defecto
+        });
+        // Aplicar filtro "Original" automáticamente
+        _applyFilter('Original');
+        // Avanzar a la página de filtros
+        _goToStep(1);
+      } else {
+        if (mounted) {
+          await ErrorDialog.show(
+            context,
+            title: 'Error',
+            message: 'Error al guardar la imagen. Por favor, intenta nuevamente.',
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        await ErrorDialog.show(
+          context,
+          title: 'Error',
+          message: 'Error al procesar la imagen: ${e.toString()}',
+        );
+      }
+    }
+  }
+
+  /// Navega a un paso específico
+  void _goToStep(int step) {
+    if (_pageController.hasClients) {
+      _pageController.animateToPage(
+        step,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+    setState(() {
+      _currentStep = step;
+    });
+  }
+
+  /// Navega al siguiente paso
+  void _nextStep() {
+    if (_currentStep < 3) {
+      _goToStep(_currentStep + 1);
+    }
+  }
+
+  /// Navega al paso anterior
+  void _previousStep() {
+    if (_currentStep > 0) {
+      _goToStep(_currentStep - 1);
     }
   }
 
@@ -164,7 +285,6 @@ class _NewPostScreenState extends State<NewPostScreen> {
 
       switch (filterName.toLowerCase()) {
         case 'original':
-          // Mostrar imagen original sin procesar
           if (_originalImageBytes != null) {
             result = _originalImageBytes;
           } else {
@@ -227,9 +347,8 @@ class _NewPostScreenState extends State<NewPostScreen> {
       
       setState(() {
         _processedImage = result;
-        _currentFilter = filterName;
+        _selectedFilter = filterName;
         _isProcessing = false;
-        // No cerrar el panel de parámetros
       });
     } catch (e) {
       if (mounted) {
@@ -270,24 +389,6 @@ class _NewPostScreenState extends State<NewPostScreen> {
     await _applyFilter(filterName, params: autoParams);
   }
 
-  /// Maneja la selección de un filtro
-  void _onFilterSelected(String filterName) {
-    final filter = _filters.firstWhere((f) => f['name'] == filterName);
-    final hasParams = filter['hasParams'] as bool;
-
-    if (hasParams) {
-      // Inicializar parámetros por defecto según el filtro
-      _initializeFilterParams(filterName);
-      setState(() {
-        _showParamsPanel = true;
-        _currentFilter = filterName;
-      });
-    } else {
-      // Aplicar filtro directamente
-      _applyFilter(filterName);
-    }
-  }
-
   /// Inicializa parámetros por defecto para un filtro
   void _initializeFilterParams(String filterName) {
     switch (filterName.toLowerCase()) {
@@ -308,6 +409,27 @@ class _NewPostScreenState extends State<NewPostScreen> {
         break;
       default:
         _filterParams = {};
+    }
+  }
+
+  /// Maneja la selección de un filtro
+  void _onFilterSelected(String filterName) {
+    final filter = _filters.firstWhere((f) => f['name'] == filterName);
+    final hasParams = filter['hasParams'] as bool;
+
+    if (hasParams) {
+      _initializeFilterParams(filterName);
+      setState(() {
+        _selectedFilter = filterName;
+      });
+      // Ir a página de parámetros
+      _goToStep(2);
+    } else {
+      // Aplicar filtro directamente (incluye "Original")
+      setState(() {
+        _selectedFilter = filterName;
+      });
+      _applyFilter(filterName);
     }
   }
 
@@ -341,33 +463,26 @@ class _NewPostScreenState extends State<NewPostScreen> {
     });
 
     try {
-      // Si hay imagen procesada, guardarla temporalmente para enviarla
       File imageToSend;
       if (_processedImage != null) {
-        // Guardar imagen procesada temporalmente
         final tempDir = await getTemporaryDirectory();
         final processedPath = '${tempDir.path}/processed_post_${DateTime.now().millisecondsSinceEpoch}.png';
         final processedFile = File(processedPath);
         await processedFile.writeAsBytes(_processedImage!);
         imageToSend = processedFile;
       } else {
-        // Usar imagen original
         imageToSend = _originalImage!;
       }
 
-      // Publicar post
       await PostService.createPost(imageToSend, caption);
 
-      // Limpiar imagen temporal
       await TempImageService.clearTempImage();
       
-      // Limpiar archivo procesado si existe
       if (_processedImage != null && imageToSend.existsSync()) {
         await imageToSend.delete();
       }
 
       if (mounted) {
-        // Navegar al feed
         context.go('/home/feed');
       }
     } catch (e) {
@@ -390,10 +505,14 @@ class _NewPostScreenState extends State<NewPostScreen> {
       canPop: false,
       onPopInvoked: (didPop) {
         if (!didPop) {
-          if (context.canPop()) {
-            context.pop();
+          if (_currentStep > 0) {
+            _previousStep();
           } else {
-            context.go('/home/feed');
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home/feed');
+            }
           }
         }
       },
@@ -404,147 +523,24 @@ class _NewPostScreenState extends State<NewPostScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              // HEADER
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
-                      onPressed: () {
-                        if (context.canPop()) {
-                          context.pop();
-                        } else {
-                          context.go('/home/feed');
-                        }
-                      },
-                    ),
-                    const Text(
-                      'Nuevo Post',
-                      style: AppTypography.subtitle,
-                    ),
-                    const SizedBox(width: 48), // Balancear el layout
-                  ],
-                ),
-              ),
-
-              // CONTENIDO PRINCIPAL
+              // HEADER con indicador de paso
+              _buildHeader(),
+              
+              // CONTENIDO PRINCIPAL - PageView
               Expanded(
-                child: Column(
+                child: PageView(
+                  controller: _pageController,
+                  physics: const NeverScrollableScrollPhysics(), // Deshabilitar swipe manual
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentStep = index;
+                    });
+                  },
                   children: [
-                    // ÁREA DE IMAGEN (FIJA)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: _buildImageArea(),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // CONTENIDO SCROLLEABLE (FILTROS, PARÁMETROS, DESCRIPCIÓN)
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // LISTA DE FILTROS (solo si hay imagen)
-                            if (_originalImage != null) ...[
-                              _buildFiltersList(),
-                              const SizedBox(height: 16),
-                            ],
-
-                            // PANEL DE PARÁMETROS (si está visible)
-                            if (_showParamsPanel && _currentFilter != null) ...[
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Colors.white.withOpacity(0.2)),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          'Parámetros: ${_currentFilter!}',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.close, color: Colors.white70),
-                                          onPressed: () {
-                                            setState(() {
-                                              _showParamsPanel = false;
-                                            });
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 16),
-                                    FilterParamsPanel(
-                                      filterName: _currentFilter!,
-                                      initialParams: _filterParams,
-                                      onApply: (params) {
-                                        _applyFilter(_currentFilter!, params: params);
-                                      },
-                                      onAuto: () {
-                                        _applyFilterAuto(_currentFilter!);
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                            ],
-
-                            // CAMPO DE DESCRIPCIÓN
-                            const Text(
-                              'Descripción',
-                              style: AppTypography.body,
-                            ),
-                            const SizedBox(height: 12),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withAlpha(30),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.white38),
-                              ),
-                              child: TextField(
-                                controller: _captionController,
-                                maxLines: 5,
-                                style: const TextStyle(color: Colors.white),
-                                decoration: const InputDecoration(
-                                  hintText: 'Escribe algo sobre tu foto',
-                                  hintStyle: TextStyle(color: Colors.white54),
-                                  border: InputBorder.none,
-                                ),
-                              ),
-                            ),
-
-                            const SizedBox(height: 24),
-
-                            // BOTÓN PUBLICAR
-                            PrimaryButton(
-                              label: _isPublishing ? 'Publicando...' : 'Publicar',
-                              isLoading: _isPublishing,
-                              isDisabled: _originalImage == null || _isPublishing || _isProcessing,
-                              onPressed: _publishPost,
-                            ),
-
-                            const SizedBox(height: 24),
-                          ],
-                        ),
-                      ),
-                    ),
+                    _buildStep1ImageSelection(),
+                    _buildStep2FilterSelection(),
+                    _buildStep3FilterParams(),
+                    _buildStep4Description(),
                   ],
                 ),
               ),
@@ -555,81 +551,394 @@ class _NewPostScreenState extends State<NewPostScreen> {
     );
   }
 
-  /// Construye el área de selección/vista previa de imagen
-  Widget _buildImageArea() {
-    if (_isProcessing) {
-      return Container(
-        height: 300,
-        decoration: BoxDecoration(
-          color: Colors.white.withAlpha(40),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white38),
-        ),
-        child: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(color: Colors.white),
-              SizedBox(height: 16),
-              Text(
-                'Aplicando filtro...',
+  /// Construye el header con indicador de paso
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.white),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/home/feed');
+              }
+            },
+          ),
+          // Indicador de paso
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(4, (index) {
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: index == _currentStep
+                      ? AppColors.upsYellow
+                      : Colors.white.withOpacity(0.3),
+                ),
+              );
+            }),
+          ),
+          // Balancear layout
+          const SizedBox(width: 48),
+        ],
+      ),
+    );
+  }
+
+  /// Página 1: Selección de imagen
+  Widget _buildStep1ImageSelection() {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Área de imagen
+          Expanded(
+            child: Center(
+              child: _originalImage != null && _originalImageBytes != null
+                  ? _buildImagePreview(_originalImageBytes!)
+                  : _buildEmptyImageArea(),
+            ),
+          ),
+          
+          const SizedBox(height: 24),
+          
+          // Botones
+          if (_originalImage != null) ...[
+            PrimaryButton(
+              label: 'Siguiente',
+              onPressed: _nextStep,
+            ),
+          ] else ...[
+            PrimaryButton(
+              label: 'Seleccionar imagen',
+              onPressed: () => _pickImage(ImageSource.gallery),
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: _openCamera,
+              child: const Text(
+                'Abrir cámara',
                 style: TextStyle(color: Colors.white70),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Página 2: Selección de filtros
+  Widget _buildStep2FilterSelection() {
+    if (_originalImage == null) {
+      return const Center(
+        child: Text(
+          'Por favor, selecciona una imagen primero',
+          style: TextStyle(color: Colors.white70),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        // Preview grande de la imagen
+        Expanded(
+          flex: 3,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: _buildLargeImagePreview(),
+          ),
+        ),
+        
+        // Burbujas de filtros
+        Expanded(
+          flex: 2,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  'Filtros',
+                  style: AppTypography.body,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  itemCount: _filters.length,
+                  itemBuilder: (context, index) {
+                    final filter = _filters[index];
+                    final filterName = filter['name'] as String;
+                    final isSelected = _selectedFilter == filterName ||
+                        (filterName == 'Original' && _selectedFilter == null && _processedImage == null);
+                    
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 16),
+                      child: FilterPreviewBubble(
+                        filterName: filterName,
+                        icon: filter['icon'] as IconData,
+                        originalImage: _originalImage!,
+                        isSelected: isSelected,
+                        hasParams: filter['hasParams'] as bool,
+                        onTap: () => _onFilterSelected(filterName),
+                      ),
+                    );
+                  },
+                ),
               ),
             ],
           ),
         ),
-      );
-    }
+        
+        // Botones de navegación
+        Padding(
+          padding: const EdgeInsets.all(24),
+          child: Row(
+            children: [
+              Expanded(
+                child: PrimaryButton(
+                  label: 'Atrás',
+                  variant: ButtonVariant.ghost,
+                  onPressed: _previousStep,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: PrimaryButton(
+                  label: 'Siguiente',
+                  onPressed: _nextStep,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
-    if (_processedImage != null) {
-      // Mostrar imagen procesada
-      return GestureDetector(
-        onTap: _selectImage,
-        child: Container(
-          height: 300,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white38, width: 2),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: Image.memory(
-              _processedImage!,
-              fit: BoxFit.cover,
-              width: double.infinity,
-            ),
-          ),
+  /// Página 3: Parámetros de filtro
+  Widget _buildStep3FilterParams() {
+    if (_originalImage == null || _selectedFilter == null) {
+      return const Center(
+        child: Text(
+          'No hay filtro seleccionado',
+          style: TextStyle(color: Colors.white70),
         ),
       );
     }
 
-    if (_originalImage != null && _originalImageBytes != null) {
-      // Mostrar imagen original usando bytes para evitar problemas de caché
-      return GestureDetector(
-        onTap: _selectImage,
-        child: Container(
-          height: 300,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white38, width: 2),
+    return Column(
+      children: [
+        // Preview grande de la imagen con filtro
+        Expanded(
+          flex: 3,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: _buildLargeImagePreview(),
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: Image.memory(
-              _originalImageBytes!,
-              fit: BoxFit.cover,
-              width: double.infinity,
+        ),
+        
+        // Panel de parámetros
+        Expanded(
+          flex: 2,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withOpacity(0.2)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Parámetros: $_selectedFilter',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  FilterParamsPanel(
+                    filterName: _selectedFilter!,
+                    initialParams: _filterParams,
+                    onApply: (params) {
+                      _applyFilter(_selectedFilter!, params: params);
+                    },
+                    onAuto: () {
+                      _applyFilterAuto(_selectedFilter!);
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ),
-      );
-    }
+        
+        // Botones de navegación
+        Padding(
+          padding: const EdgeInsets.all(24),
+          child: Row(
+            children: [
+              Expanded(
+                child: PrimaryButton(
+                  label: 'Atrás',
+                  variant: ButtonVariant.ghost,
+                  onPressed: () {
+                    _goToStep(1); // Volver a selección de filtros
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: PrimaryButton(
+                  label: 'Aplicar',
+                  onPressed: () {
+                    // Avanzar al paso 4 (descripción) después de aplicar
+                    _goToStep(3);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
-    // Área de selección vacía
+  /// Página 4: Descripción y publicar
+  Widget _buildStep4Description() {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          const SizedBox(height: 20),
+          
+          // Campo de descripción
+          const Text(
+            'Descripción',
+            style: AppTypography.body,
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white38),
+            ),
+            child: TextField(
+              controller: _captionController,
+              focusNode: _captionFocusNode,
+              maxLines: 5,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                hintText: 'Escribe algo sobre tu foto',
+                hintStyle: TextStyle(color: Colors.white54),
+                border: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                enabledBorder: InputBorder.none,
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 24),
+          
+          // Frases predeterminadas
+          const Text(
+            'Sugerencias',
+            style: AppTypography.body,
+          ),
+          const SizedBox(height: 12),
+          
+          // Grid de frases sugeridas
+          Expanded(
+            child: SingleChildScrollView(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _suggestedCaptions.map((caption) {
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _captionController.text = caption;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        caption,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+          
+          // Botones de navegación (ocultos cuando el teclado está visible)
+          if (!_isKeyboardVisible) ...[
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: PrimaryButton(
+                    label: 'Atrás',
+                    variant: ButtonVariant.ghost,
+                    onPressed: _previousStep,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: PrimaryButton(
+                    label: _isPublishing ? 'Publicando...' : 'Publicar',
+                    isLoading: _isPublishing,
+                    isDisabled: _isPublishing || _isProcessing,
+                    onPressed: _publishPost,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Construye el área vacía para seleccionar imagen
+  Widget _buildEmptyImageArea() {
     return GestureDetector(
-      onTap: _selectImage,
+      onTap: _showImageSourceDialog,
       child: Container(
-        height: 300,
+        width: double.infinity,
         decoration: BoxDecoration(
           color: Colors.white.withAlpha(40),
           borderRadius: BorderRadius.circular(16),
@@ -659,37 +968,74 @@ class _NewPostScreenState extends State<NewPostScreen> {
     );
   }
 
-  /// Construye la lista horizontal de filtros
-  Widget _buildFiltersList() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Filtros',
-          style: AppTypography.body,
+  /// Construye preview de imagen
+  Widget _buildImagePreview(Uint8List imageBytes) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white38, width: 2),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Image.memory(
+          imageBytes,
+          fit: BoxFit.cover,
         ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 50,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: _filters.length,
-            itemBuilder: (context, index) {
-              final filter = _filters[index];
-              final filterName = filter['name'] as String;
-              final isActive = _currentFilter == filterName ||
-                  (filterName == 'Original' && _currentFilter == null && _processedImage == null);
+      ),
+    );
+  }
 
-              return FilterItem(
-                name: filterName,
-                icon: filter['icon'] as IconData,
-                isActive: isActive,
-                onTap: () => _onFilterSelected(filterName),
-              );
-            },
+  /// Construye preview grande de imagen (con o sin filtro)
+  Widget _buildLargeImagePreview() {
+    if (_isProcessing) {
+      return Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white.withAlpha(40),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white38),
+        ),
+        child: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: Colors.white),
+              SizedBox(height: 16),
+              Text(
+                'Aplicando filtro...',
+                style: TextStyle(color: Colors.white70),
+              ),
+            ],
           ),
         ),
-      ],
+      );
+    }
+
+    Uint8List? imageToShow;
+    if (_processedImage != null) {
+      imageToShow = _processedImage;
+    } else if (_originalImageBytes != null) {
+      imageToShow = _originalImageBytes;
+    }
+
+    if (imageToShow == null) {
+      return _buildEmptyImageArea();
+    }
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white38, width: 2),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Image.memory(
+          imageToShow,
+          fit: BoxFit.contain,
+        ),
+      ),
     );
   }
 }
