@@ -146,30 +146,30 @@ class _FeedScreenState extends State<FeedScreen> {
       timeAgo = _getTimeAgo(timestamp.toDate());
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Colors.white.withAlpha(25),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Imagen del post - Tapa para ver detalles
-          GestureDetector(
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => PostDetailScreen(
-                    postId: docId,
-                    imageUrl: imageUrl,
-                    description: caption,
-                    authorUid: authorUid,
-                  ),
-                ),
-              );
-            },
-            child: Hero(
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => PostDetailScreen(
+              postId: docId,
+              imageUrl: imageUrl,
+              description: caption,
+              authorUid: authorUid,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: Colors.white.withAlpha(25),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Imagen del post
+            Hero(
               tag: docId,
               child: ClipRRect(
                 borderRadius: const BorderRadius.vertical(
@@ -205,122 +205,123 @@ class _FeedScreenState extends State<FeedScreen> {
                 ),
               ),
             ),
-          ),
 
-          // Contenido textual
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Usuario + fecha
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Nombre dinámico desde Firebase 'Users'
-                    // Nombre dinámico desde Firebase 'Users'
-                    GestureDetector(
-                      onTap: () {
-                        GoRouter.of(context).push('/profile/$authorUid');
-                      },
-                      child: _UserNameFetcher(uid: authorUid),
-                    ),
-
-                    Text(
-                      timeAgo,
-                      style: const TextStyle(
-                        color: Colors.white60,
-                        fontSize: 12,
+            // Contenido textual
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Usuario + fecha
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Nombre dinámico desde Firebase 'Users'
+                      GestureDetector(
+                        onTap: () {
+                          GoRouter.of(context).push('/profile/$authorUid');
+                        },
+                        behavior: HitTestBehavior.opaque,
+                        child: _UserNameFetcher(uid: authorUid),
                       ),
-                    ),
-                  ],
-                ),
 
-                const SizedBox(height: 6),
-
-                // Descripción
-                if (caption.isNotEmpty)
-                  Text(
-                    caption,
-                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                      Text(
+                        timeAgo,
+                        style: const TextStyle(
+                          color: Colors.white60,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
 
-                const SizedBox(height: 8),
+                  const SizedBox(height: 6),
 
-                // Barra de Acciones: Likes y Comentarios
-                Row(
-                  children: [
-                    // --- LIKES (Interactivo con animación) ---
-                    LikeButton(
-                      postId: docId,
-                      initialLikesCount: likes,
-                      iconSize: 22,
-                      likedColor: Colors.redAccent,
-                      unlikedColor: Colors.white70,
-                      countStyle: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
+                  // Descripción
+                  if (caption.isNotEmpty)
+                    Text(
+                      caption,
+                      style: const TextStyle(color: Colors.white70, fontSize: 14),
                     ),
 
-                    const SizedBox(width: 24), // Espacio entre grupos
-                    // --- COMENTARIOS (Interactivo) ---
-                    GestureDetector(
-                      onTap: () {
-                        // Navegar a la pantalla de detalle del post
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => PostDetailScreen(
-                              postId: docId,
-                              imageUrl: imageUrl,
-                              description: caption,
-                              authorUid: authorUid,
+                  const SizedBox(height: 8),
+
+                  // Barra de Acciones: Comentarios y Likes
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // --- COMENTARIOS (Interactivo) ---
+                      GestureDetector(
+                        onTap: () {
+                          // Navegar a la pantalla de detalle del post
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => PostDetailScreen(
+                                postId: docId,
+                                imageUrl: imageUrl,
+                                description: caption,
+                                authorUid: authorUid,
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.chat_bubble_outline,
-                            color: Colors.white70,
-                            size: 22,
-                          ),
-                          const SizedBox(width: 6),
-                          StreamBuilder<DocumentSnapshot>(
-                            stream: FirebaseFirestore.instance
-                                .collection('Posts')
-                                .doc(docId)
-                                .snapshots(),
-                            builder: (context, postSnapshot) {
-                              int currentComments = comments;
-                              if (postSnapshot.hasData && postSnapshot.data != null) {
-                                final data = postSnapshot.data!.data() as Map<String, dynamic>?;
-                                if (data != null) {
-                                  currentComments = data['pos_commentsCount'] as int? ?? comments;
+                          );
+                        },
+                        behavior: HitTestBehavior.opaque,
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.chat_bubble_outline,
+                              color: Colors.white70,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 6),
+                            StreamBuilder<DocumentSnapshot>(
+                              stream: FirebaseFirestore.instance
+                                  .collection('Posts')
+                                  .doc(docId)
+                                  .snapshots(),
+                              builder: (context, postSnapshot) {
+                                int currentComments = comments;
+                                if (postSnapshot.hasData && postSnapshot.data != null) {
+                                  final data = postSnapshot.data!.data() as Map<String, dynamic>?;
+                                  if (data != null) {
+                                    currentComments = data['pos_commentsCount'] as int? ?? comments;
+                                  }
                                 }
-                              }
-                              
-                              return Text(
-                                '$currentComments',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              );
-                            },
-                          ),
-                        ],
+                                
+                                return Text(
+                                  '$currentComments',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                      
+                      // --- LIKES (Interactivo con animación) ---
+                      LikeButton(
+                        postId: docId,
+                        initialLikesCount: likes,
+                        iconSize: 22,
+                        likedColor: Colors.redAccent,
+                        unlikedColor: Colors.white70,
+                        countStyle: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
