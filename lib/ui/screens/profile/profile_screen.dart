@@ -1,18 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import '../../theme/typography.dart';
 import '../../theme/colors.dart';
 import '../../widgets/effects/gradient_background.dart';
-import '../../widgets/dialogs/error_dialog.dart';
 import '../../widgets/follow_button.dart';
 import '../../widgets/user_list_item.dart';
-import '../../../services/auth/auth_service.dart';
 import '../../../services/subscriptions/subscription_service.dart';
 import '../../../models/user_model.dart';
 import '../post/post_detail_screen.dart';
 import 'edit_profile_screen.dart';
 import '../../widgets/full_screen_image_viewer.dart';
+import 'profile_controller.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? userId; // Si es null, es MI perfil
@@ -24,118 +22,308 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  String? _userName;
-  String? _userEmail;
-  String? _userBio; // Nuevo campo
-  String? _photoUrl;
-  bool _isLoading = true;
-  String? _currentUserId; // ID del perfil que estamos viendo
-  String? _myUserId; // Mi propio ID
+  late final ProfileController _controller;
 
   @override
   void initState() {
     super.initState();
-    _initProfile();
+    _controller = ProfileController();
+    // Inicializar controlador (determinar ID y cargar datos)
+    _controller.init(widget.userId);
   }
 
-  Future<void> _initProfile() async {
-    // 1. Obtener mi ID
-    _myUserId = await AuthService.getUserId();
-
-    // 2. Determinar qué ID vamos a mostrar
-    if (widget.userId != null) {
-      _currentUserId = widget.userId;
-    } else {
-      // Si es mi perfil, usar mi ID
-      _currentUserId = _myUserId;
-    }
-
-    await _loadUserData();
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
-  /// Carga los datos del usuario (Local o Firestore)
-  Future<void> _loadUserData() async {
-    setState(() => _isLoading = true);
-
-    try {
-      if (widget.userId != null) {
-        // === PERFIL DE OTRO (Firestore) ===
-        final doc = await FirebaseFirestore.instance
-            .collection('Users')
-            .doc(widget.userId)
-            .get();
-
-        if (doc.exists) {
-          final data = doc.data()!;
-          if (mounted) {
-            setState(() {
-              _userName = data['usr_username'] as String?;
-              _userEmail = data['usr_email'] as String?;
-              _userBio = data['usr_bio'] as String?; // Si existe en DB
-              _photoUrl = data['usr_photoUrl'] as String?;
-              _isLoading = false;
-            });
-          }
-        }
-      } else {
-        // === MI PERFIL (Firestore) ===
-        if (_currentUserId != null) {
-          final doc = await FirebaseFirestore.instance
-              .collection('Users')
-              .doc(_currentUserId)
-              .get();
-
-          if (doc.exists) {
-            final data = doc.data()!;
-            if (mounted) {
-              setState(() {
-                _userName = data['usr_username'] as String?;
-                _userEmail = data['usr_email'] as String?;
-                _userBio = data['usr_bio'] as String?;
-                _photoUrl = data['usr_photoUrl'] as String?;
-                _isLoading = false;
-              });
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(gradient: AppGradients.welcomeBackground),
+      child: SafeArea(
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            // 1. Cargando
+            if (_controller.isLoading) {
+              return const Center(
+                child: CircularProgressIndicator(color: Colors.white),
+              );
             }
-          } else {
-            // Fallback a datos del token
-            final name = await AuthService.getUserName();
-            final email = await AuthService.getUserEmail();
-            if (mounted) {
-              setState(() {
-                _userName = name;
-                _userEmail = email;
-                _isLoading = false;
-              });
-            }
-          }
-        } else {
-          // Fallback a datos del token
-          final name = await AuthService.getUserName();
-          final email = await AuthService.getUserEmail();
-          if (mounted) {
-            setState(() {
-              _userName = name;
-              _userEmail = email;
-              _isLoading = false;
-            });
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Error cargando perfil: $e');
-      if (mounted) {
-        setState(() => _isLoading = false);
-        await ErrorDialog.show(
-          context,
-          title: 'Error al cargar perfil',
-          message:
-              'No se pudieron cargar los datos del perfil. Por favor, intenta nuevamente.',
-        );
-      }
-    }
+
+            // 2. Datos listos
+            return Column(
+              children: [
+                _buildHeader(context),
+                _buildUserInfo(context),
+                _buildPostsGrid(context),
+              ],
+            );
+          },
+        ),
+      ),
+    );
   }
 
-  /// Muestra el diálogo de configuración con opción de cerrar sesión
+  /// HEADER SUPERIOR
+  Widget _buildHeader(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: const [
+              Text('UPS', style: AppTypography.titleUPS),
+              SizedBox(width: 4),
+              Text('tagram', style: AppTypography.titleGlam),
+            ],
+          ),
+          // Solo mostrar configuración si es MI perfil
+          if (_controller.isMyProfile)
+            IconButton(
+              onPressed: () => _showSettingsDialog(context),
+              icon: const Icon(
+                Icons.settings_outlined,
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// INFO DEL USUARIO
+  Widget _buildUserInfo(BuildContext context) {
+    final user = _controller.user;
+    if (user == null) return const SizedBox();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // Avatar con Zoom
+              GestureDetector(
+                onTap: () {
+                  if (user.photoUrl != null && user.photoUrl!.isNotEmpty) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => FullScreenImageViewer(
+                          imageUrl: user.photoUrl!,
+                          heroTag: 'profile_avatar_${user.uid}',
+                        ),
+                      ),
+                    );
+                  }
+                },
+                child: Hero(
+                  tag: 'profile_avatar_${user.uid}',
+                  child: CircleAvatar(
+                    radius: 46,
+                    backgroundColor: AppColors.upsBlue,
+                    backgroundImage: NetworkImage(user.getAvatarUrl()),
+                  ),
+                ),
+              ),
+
+              // Bocadillo de Bio (Si existe)
+              if (user.bio != null && user.bio!.isNotEmpty)
+                Positioned(top: 0, left: 70, child: _buildBioBubble(user.bio!)),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // Nombre
+          Text(
+            user.username,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+
+          const SizedBox(height: 4),
+
+          // Email
+          Text(
+            user.email,
+            style: const TextStyle(color: Colors.white70, fontSize: 14),
+          ),
+
+          const SizedBox(height: 20),
+
+          // Botón de seguir/dejar de seguir (solo si NO es mi perfil)
+          if (!_controller.isMyProfile &&
+              _controller.isMyProfile == false) // Redundante pero explícito
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: FollowButton(
+                targetUserId: user.uid,
+                width: 200,
+                height: 36,
+                fontSize: 15,
+              ),
+            ),
+
+          // Estadísticas
+          _StatsRow(userId: user.uid),
+
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  /// GLOBO DE BIO
+  Widget _buildBioBubble(String bio) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // Pico del globo
+        Positioned(
+          top: 12,
+          left: -6,
+          child: Transform.rotate(
+            angle: -0.785,
+            child: Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 4,
+                    offset: const Offset(-1, 1),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // Cuerpo del globo
+        Container(
+          constraints: const BoxConstraints(maxWidth: 110),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 8,
+                offset: const Offset(2, 4),
+              ),
+            ],
+          ),
+          child: Text(
+            bio,
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.upsBlueDark,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              height: 1.2,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// GRID DE PUBLICACIONES
+  Widget _buildPostsGrid(BuildContext context) {
+    final uid = _controller.currentUserId;
+    if (uid == null) return const SizedBox();
+
+    return Expanded(
+      child: Column(
+        children: [
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Mis publicaciones', style: AppTypography.body),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('Posts')
+                  .where('pos_authorUid', isEqualTo: uid)
+                  .orderBy('pos_timestamp', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: Colors.white24),
+                  );
+                }
+
+                final docs = snapshot.data?.docs ?? [];
+                if (docs.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'Sin publicaciones',
+                      style: TextStyle(color: Colors.white30),
+                    ),
+                  );
+                }
+
+                return GridView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: docs.length,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    mainAxisSpacing: 6,
+                    crossAxisSpacing: 6,
+                  ),
+                  itemBuilder: (context, i) {
+                    final doc = docs[i];
+                    final data = doc.data() as Map<String, dynamic>;
+                    final img = data['pos_imageUrl'] as String? ?? '';
+                    final caption = data['pos_caption'] as String? ?? '';
+
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => PostDetailScreen(
+                              postId: doc.id,
+                              imageUrl: img,
+                              description: caption,
+                              authorUid: uid,
+                            ),
+                          ),
+                        );
+                      },
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.network(img, fit: BoxFit.cover),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// DIÁLOGO DE CONFIGURACIÓN
   void _showSettingsDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -166,20 +354,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 onTap: () async {
-                  Navigator.of(dialogContext).pop();
+                  Navigator.of(dialogContext).pop(); // Cerrar dialog
+                  final user = _controller.user;
+                  if (user == null) return;
+
                   final result = await Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (context) => EditProfileScreen(
-                        currentName: _userName ?? '',
-                        currentBio: _userBio ?? '',
-                        currentPhotoUrl: _photoUrl,
+                        currentName: user.username,
+                        currentBio: user.bio ?? '',
+                        currentPhotoUrl: user.photoUrl,
                       ),
                     ),
                   );
 
-                  // Si se guardaron cambios, recargar perfil
                   if (result == true) {
-                    await _loadUserData();
+                    await _controller.loadProfile(); // Recargar datos
                   }
                 },
               ),
@@ -202,9 +392,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
+              onPressed: () => Navigator.of(dialogContext).pop(),
               child: const Text(
                 'Cancelar',
                 style: TextStyle(color: Colors.white70),
@@ -216,9 +404,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  /// Maneja el cierre de sesión
+  /// PROCESO DE LOGOUT CON CONFIRMACIÓN
   Future<void> _handleLogout(BuildContext context) async {
-    // Mostrar diálogo de confirmación
     final confirm = await showDialog<bool>(
       context: context,
       builder: (BuildContext dialogContext) {
@@ -240,7 +427,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Icono de advertencia
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -254,8 +440,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-
-                // Título
                 const Text(
                   'Cerrar sesión',
                   style: TextStyle(
@@ -265,8 +449,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-
-                // Mensaje
                 Text(
                   '¿Estás seguro de que deseas cerrar sesión?',
                   textAlign: TextAlign.center,
@@ -277,15 +459,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-
-                // Botones
                 Row(
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () {
-                          Navigator.of(dialogContext).pop(false);
-                        },
+                        onPressed: () => Navigator.of(dialogContext).pop(false),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
                           side: BorderSide(
@@ -309,9 +487,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.of(dialogContext).pop(true);
-                        },
+                        onPressed: () => Navigator.of(dialogContext).pop(true),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.redAccent,
                           foregroundColor: Colors.white,
@@ -340,355 +516,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
 
     if (confirm == true) {
-      // Eliminar token
-      await AuthService.deleteToken();
-
-      // Redirigir al login
-      if (context.mounted) {
-        context.go('/login');
-      }
+      await _controller.signOut(context);
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(gradient: AppGradients.welcomeBackground),
-      child: SafeArea(
-        child: Column(
-          children: [
-            // ===========================
-            // HEADER SUPERIOR
-            // ===========================
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: const [
-                      Text('UPS', style: AppTypography.titleUPS),
-                      SizedBox(width: 4),
-                      Text('tagram', style: AppTypography.titleGlam),
-                    ],
-                  ),
-                  // Solo mostrar configuración si es MI perfil
-                  if (widget.userId == null)
-                    IconButton(
-                      onPressed: () {
-                        _showSettingsDialog(context);
-                      },
-                      icon: const Icon(
-                        Icons.settings_outlined,
-                        color: Colors.white,
-                        size: 28,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-
-            // ===========================
-            // INFO DEL USUARIO
-            // ===========================
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      // Avatar con Zoom
-                      GestureDetector(
-                        onTap: () {
-                          // Solo abrir si hay una URL real, o usar la generada también
-                          final imageToShow =
-                              (_photoUrl != null && _photoUrl!.isNotEmpty)
-                              ? _photoUrl!
-                              : 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(_userName ?? 'Usuario')}&background=003F87&color=fff&size=500&bold=true'; // Pedimos versión HD para el zoom
-
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => FullScreenImageViewer(
-                                imageUrl: imageToShow,
-                                heroTag:
-                                    'profile_avatar_${_currentUserId ?? 'unknown'}', // Tag único por si hay varios perfiles
-                              ),
-                            ),
-                          );
-                        },
-                        child: Hero(
-                          tag: 'profile_avatar_${_currentUserId ?? 'unknown'}',
-                          child: CircleAvatar(
-                            radius: 46,
-                            backgroundColor: AppColors.upsBlue,
-                            backgroundImage:
-                                (_photoUrl != null && _photoUrl!.isNotEmpty)
-                                ? NetworkImage(_photoUrl!)
-                                : NetworkImage(
-                                    'https://ui-avatars.com/api/?name=${Uri.encodeComponent(_userName ?? 'Usuario')}&background=003F87&color=fff&size=200&bold=true',
-                                  ),
-                          ),
-                        ),
-                      ),
-
-                      // Bocadillo de Estado (Lateral Derecho)
-                      if (_userBio != null && _userBio!.isNotEmpty)
-                        Positioned(
-                          top: 0,
-                          left: 70,
-                          child: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              // El pico del globo (triángulo apuntando al avatar)
-                              Positioned(
-                                top: 12,
-                                left: -6,
-                                child: Transform.rotate(
-                                  angle: -0.785, // -45 grados
-                                  child: Container(
-                                    width: 12,
-                                    height: 12,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.05),
-                                          blurRadius: 4,
-                                          offset: const Offset(-1, 1),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              // El cuerpo del globo
-                              Container(
-                                constraints: const BoxConstraints(
-                                  maxWidth: 110,
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(20),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.1),
-                                      blurRadius: 8,
-                                      offset: const Offset(2, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: Text(
-                                  _userBio!,
-                                  textAlign: TextAlign.start,
-                                  maxLines: 4,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: AppColors.upsBlueDark,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    height: 1.2,
-                                  ),
-                                ),
-                              ),
-                              // Parche para tapar la sombra interna del pico donde se une al globo
-                              Positioned(
-                                top: 10,
-                                left: 0,
-                                width: 10,
-                                height: 16,
-                                child: Container(color: Colors.white),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  _isLoading
-                      ? const SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : Text(
-                          _userName ?? 'Usuario',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-
-                  const SizedBox(height: 4),
-
-                  _isLoading
-                      ? const SizedBox(height: 20)
-                      : Text(
-                          _userEmail ?? 'No disponible',
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                          ),
-                        ),
-
-                  const SizedBox(height: 20),
-
-                  // Botón de seguir/dejar de seguir (solo si no es mi perfil)
-                  if (_currentUserId != null &&
-                      _myUserId != null &&
-                      _currentUserId != _myUserId)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: FollowButton(
-                        targetUserId: _currentUserId!,
-                        width: 200,
-                        height: 36,
-                        fontSize: 15,
-                      ),
-                    ),
-
-                  // ===========================
-                  // ESTADÍSTICAS
-                  // ===========================
-                  if (_currentUserId != null)
-                    _StatsRow(userId: _currentUserId!)
-                  else
-                    const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _StatItem(label: 'Posts', value: '0'),
-                        SizedBox(width: 32),
-                        _StatItem(label: 'Seguidores', value: '0'),
-                        SizedBox(width: 32),
-                        _StatItem(label: 'Siguiendo', value: '0'),
-                      ],
-                    ),
-
-                  const SizedBox(height: 8),
-                ],
-              ),
-            ),
-
-            // ===========================
-            // GRID DE PUBLICACIONES
-            // ===========================
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Mis publicaciones', style: AppTypography.body),
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            Expanded(
-              child: Builder(
-                builder: (context) {
-                  // Usar _currentUserId que ya está establecido correctamente
-                  // (widget.userId si es otro perfil, o _myUserId si es mi perfil)
-                  final targetUid = _currentUserId;
-
-                  if (targetUid == null) {
-                    return const Center(
-                      child: Text(
-                        'Cargando publicaciones...',
-                        style: TextStyle(color: Colors.white54),
-                      ),
-                    );
-                  }
-
-                  return StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('Posts')
-                        .where('pos_authorUid', isEqualTo: targetUid)
-                        .orderBy('pos_timestamp', descending: true)
-                        .snapshots(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(
-                          child: CircularProgressIndicator(
-                            color: Colors.white24,
-                          ),
-                        );
-                      }
-
-                      final docs = snapshot.data?.docs ?? [];
-
-                      if (docs.isEmpty) {
-                        return const Center(
-                          child: Text(
-                            'Sin publicaciones',
-                            style: TextStyle(color: Colors.white30),
-                          ),
-                        );
-                      }
-
-                      return GridView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        itemCount: docs.length,
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 3,
-                              mainAxisSpacing: 6,
-                              crossAxisSpacing: 6,
-                            ),
-                        itemBuilder: (context, i) {
-                          final doc = docs[i];
-                          final data = doc.data() as Map<String, dynamic>;
-                          final img = data['pos_imageUrl'] as String? ?? '';
-                          final caption = data['pos_caption'] as String? ?? '';
-                          final authorUid =
-                              data['pos_authorUid'] as String? ?? targetUid;
-                          final postId = doc.id;
-
-                          return GestureDetector(
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => PostDetailScreen(
-                                    postId: postId,
-                                    imageUrl: img,
-                                    description: caption,
-                                    authorUid: authorUid,
-                                  ),
-                                ),
-                              );
-                            },
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Image.network(img, fit: BoxFit.cover),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 
-// Widget para estadísticas reactivas y clickeables
+// Widget para estadísticas (Mantenido casi igual pero independiente)
 class _StatsRow extends StatelessWidget {
   final String userId;
-
   const _StatsRow({required this.userId});
 
   @override
@@ -704,15 +539,11 @@ class _StatsRow extends StatelessWidget {
               .snapshots(),
           builder: (context, snapshot) {
             final postsCount = snapshot.data?.docs.length ?? 0;
-            return _StatItem(
-              label: 'Posts',
-              value: '$postsCount',
-              onTap: null, // Posts no es clickeable por ahora
-            );
+            return _StatItem(label: 'Posts', value: '$postsCount');
           },
         ),
         const SizedBox(width: 32),
-        // Seguidores (clickeable)
+        // Seguidores
         StreamBuilder<int>(
           stream: SubscriptionService.getFollowersCountStream(userId),
           builder: (context, snapshot) {
@@ -725,7 +556,7 @@ class _StatsRow extends StatelessWidget {
           },
         ),
         const SizedBox(width: 32),
-        // Siguiendo (clickeable)
+        // Siguiendo
         StreamBuilder<int>(
           stream: SubscriptionService.getFollowingCountStream(userId),
           builder: (context, snapshot) {
@@ -766,12 +597,10 @@ class _StatsRow extends StatelessWidget {
   }
 }
 
-// Widget pequeño para estadísticas
 class _StatItem extends StatelessWidget {
   final String label;
   final String value;
   final VoidCallback? onTap;
-
   const _StatItem({required this.label, required this.value, this.onTap});
 
   @override
@@ -793,11 +622,7 @@ class _StatItem extends StatelessWidget {
         ),
       ],
     );
-
-    if (onTap != null) {
-      return GestureDetector(onTap: onTap, child: widget);
-    }
-
+    if (onTap != null) return GestureDetector(onTap: onTap, child: widget);
     return widget;
   }
 }
