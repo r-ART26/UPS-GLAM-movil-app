@@ -229,10 +229,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text('Comentarios', style: AppTypography.h3),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showCommentInput(context),
-        backgroundColor: AppColors.upsYellow,
-        child: const Icon(Icons.chat_bubble_outline, color: Colors.black),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 80), // Levantar FAB sobre NavBar
+        child: FloatingActionButton(
+          onPressed: () => _showCommentInput(context),
+          backgroundColor: AppColors.upsYellow,
+          child: const Icon(Icons.chat_bubble_outline, color: Colors.black),
+        ),
       ),
       body: Container(
         decoration: const BoxDecoration(gradient: AppGradients.darkBackground),
@@ -241,6 +244,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             // 1. Contenido del Post (Scrollable)
             Expanded(
               child: SingleChildScrollView(
+                padding: const EdgeInsets.only(
+                  bottom: 200,
+                ), // Espacio para el FAB flotante
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
