@@ -408,7 +408,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
           result = await ImageProcessingService.applyRipple(
             _originalImage!,
             edgeThreshold: _toDouble(params?['edge_threshold']),
-            colorLevels: _toInt(params?['color_levels']),
+            colorLevels: 4,
             saturation: _toDouble(params?['saturation']),
           );
           break;
