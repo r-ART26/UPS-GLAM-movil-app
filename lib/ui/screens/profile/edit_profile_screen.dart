@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
+import '../../widgets/feedback/glam_toast.dart';
 import '../../../services/users/user_profile_service.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -67,22 +68,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Perfil actualizado correctamente'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        GlamToast.showSuccess(context, 'Perfil actualizado correctamente');
         Navigator.of(context).pop(true); // Retornar true para recargar
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        GlamToast.showError(context, 'Error al actualizar: $e');
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
