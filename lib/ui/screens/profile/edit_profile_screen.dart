@@ -56,18 +56,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _saveProfile() async {
-    if (_nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El nombre no puede estar vacío')),
-      );
-      return;
-    }
+    // Ya no validamos el nombre porque no es editable
 
     setState(() => _isSaving = true);
 
     try {
       await UserProfileService.updateProfile(
-        name: _nameController.text.trim(),
+        name: widget
+            .currentName, // Pasamos el original sin cambios solo por cumplir con la firma si fuera necesario
         bio: _bioController.text.trim(),
         imageFile: _selectedImage,
       );
@@ -185,11 +181,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             // FORMULARIO
             // ==================
 
-            // Campo Nombre
+            // Campo Nombre (ReadOnly)
             _buildTextField(
               controller: _nameController,
               label: 'Nombre',
               icon: Icons.person_outline,
+              readOnly: true, // Nuevo: Campo solo lectura
+              helperText: 'El nombre de usuario no es editable.',
             ),
 
             const SizedBox(height: 24),
@@ -227,6 +225,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     required IconData icon,
     int? maxLength,
     String? helperText,
+    bool readOnly = false, // Parámetro opcional
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -244,7 +243,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         TextField(
           controller: controller,
           maxLength: maxLength,
-          style: const TextStyle(color: Colors.white, fontSize: 16),
+          readOnly: readOnly, // Aplicamos readOnly
+          style: TextStyle(
+            color: readOnly
+                ? Colors.white38
+                : Colors.white, // Color gris si está bloqueado
+            fontSize: 16,
+          ),
           decoration: InputDecoration(
             helperText: helperText,
             helperStyle: const TextStyle(color: Colors.white24),
@@ -255,7 +260,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.upsBlue),
+              borderSide: BorderSide(
+                color: readOnly ? Colors.white24 : AppColors.upsBlue,
+              ), // Borde gris si bloqueado
             ),
             fillColor: Colors.white.withOpacity(0.05),
             filled: true,

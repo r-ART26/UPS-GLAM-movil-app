@@ -413,7 +413,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       if (_userBio != null && _userBio!.isNotEmpty)
                         Positioned(
                           top: 0,
-                          right: -85,
+                          left: 70,
                           child: Stack(
                             clipBehavior: Clip.none,
                             children: [
