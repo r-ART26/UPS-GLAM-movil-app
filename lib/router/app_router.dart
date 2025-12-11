@@ -58,7 +58,10 @@ final GoRouter appRouter = GoRouter(
         ),
         GoRoute(
           path: '/home/post/new',
-          builder: (context, state) => const NewPostScreen(),
+          builder: (context, state) {
+            final autoLoadTempImage = (state.extra as bool?) ?? false;
+            return NewPostScreen(autoLoadTempImage: autoLoadTempImage);
+          },
         ),
         GoRoute(
           path: '/home/profile',
