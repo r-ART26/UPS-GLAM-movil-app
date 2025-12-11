@@ -9,7 +9,6 @@ import '../../theme/colors.dart';
 import '../../widgets/effects/gradient_background.dart';
 import '../../widgets/buttons/primary_button.dart';
 import '../../widgets/filters/filter_preview_bubble.dart';
-import '../../widgets/filters/filter_params_panel.dart';
 import '../../widgets/dialogs/error_dialog.dart';
 import '../../../services/image/temp_image_service.dart';
 import '../../../services/image/image_processing_service.dart';
@@ -40,7 +39,6 @@ class _NewPostScreenState extends State<NewPostScreen> {
   Uint8List? _processedImage;
   /// Guarda el "key" interno del filtro seleccionado (ej: 'canny').
   String? _selectedFilter;
-  Map<String, dynamic> _filterParams = {};
   bool _isProcessing = false;
   bool _isPublishing = false;
   int _currentStep = 0;
@@ -57,14 +55,6 @@ class _NewPostScreenState extends State<NewPostScreen> {
     {'key': 'ripple', 'label': 'Cómic', 'icon': Icons.waves, 'hasParams': true},
     {'key': 'collage', 'label': 'Collage', 'icon': Icons.grid_view, 'hasParams': false},
   ];
-
-  String _getFilterLabel(String key) {
-    final match = _filters.cast<Map<String, dynamic>?>().firstWhere(
-          (f) => f?['key'] == key,
-          orElse: () => null,
-        );
-    return (match?['label'] as String?) ?? key;
-  }
 
   // Frases predeterminadas para descripción
   final List<String> _suggestedCaptions = [
@@ -291,7 +281,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
 
   /// Navega al siguiente paso
   void _nextStep() {
-    if (_currentStep < 3) {
+    if (_currentStep < 2) {
       _goToStep(_currentStep + 1);
     }
   }
@@ -438,41 +428,16 @@ class _NewPostScreenState extends State<NewPostScreen> {
     await _applyFilter(filterName, params: autoParams);
   }
 
-  /// Inicializa parámetros por defecto para un filtro
-  void _initializeFilterParams(String filterName) {
-    switch (filterName.toLowerCase()) {
-      case 'canny':
-        _filterParams = {'kernel_size': 5, 'sigma': 2, 'low_threshold': '0', 'high_threshold': '0', 'use_auto': false};
-        break;
-      case 'gaussian':
-        _filterParams = {'kernel_size': 15, 'sigma': 5, 'use_auto': false};
-        break;
-      case 'emboss':
-        _filterParams = {'kernel_size': 3, 'bias_value': 128, 'use_auto': false};
-        break;
-      case 'watermark':
-        _filterParams = {'scale': 0.3, 'transparency': 0.3, 'spacing': 0.5, 'use_auto': false};
-        break;
-      case 'ripple':
-        _filterParams = {'edge_threshold': 100, 'color_levels': 8, 'saturation': 1.2, 'use_auto': false};
-        break;
-      default:
-        _filterParams = {};
-    }
-  }
-
   /// Maneja la selección de un filtro
   void _onFilterSelected(String filterKey) {
     final filter = _filters.firstWhere((f) => f['key'] == filterKey);
     final hasParams = filter['hasParams'] as bool;
 
     if (hasParams) {
-      _initializeFilterParams(filterKey);
       setState(() {
         _selectedFilter = filterKey;
       });
-      // Ir a página de parámetros
-      _goToStep(2);
+      _applyFilterAuto(filterKey);
     } else {
       // Aplicar filtro directamente (incluye "Original")
       setState(() {
@@ -588,7 +553,6 @@ class _NewPostScreenState extends State<NewPostScreen> {
                   children: [
                     _buildStep1ImageSelection(),
                     _buildStep2FilterSelection(),
-                    _buildStep3FilterParams(),
                     _buildStep4Description(),
                   ],
                 ),
@@ -620,7 +584,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
           // Indicador de paso
           Row(
             mainAxisSize: MainAxisSize.min,
-            children: List.generate(4, (index) {
+            children: List.generate(3, (index) {
               return Container(
                 margin: const EdgeInsets.symmetric(horizontal: 4),
                 width: 8,
@@ -699,7 +663,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
       children: [
         // Preview grande de la imagen
         Expanded(
-          flex: 3,
+          flex: 4,
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: _buildLargeImagePreview(),
@@ -778,100 +742,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
     );
   }
 
-  /// Página 3: Parámetros de filtro
-  Widget _buildStep3FilterParams() {
-    if (_originalImage == null || _selectedFilter == null) {
-      return const Center(
-        child: Text(
-          'No hay filtro seleccionado',
-          style: TextStyle(color: Colors.white70),
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        // Preview grande de la imagen con filtro
-        Expanded(
-          flex: 3,
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: _buildLargeImagePreview(),
-          ),
-        ),
-        
-        // Panel de parámetros
-        Expanded(
-          flex: 2,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withOpacity(0.2)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Parámetros: ${_getFilterLabel(_selectedFilter!)}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  FilterParamsPanel(
-                    filterName: _selectedFilter!,
-                    initialParams: _filterParams,
-                    onApply: (params) {
-                      _applyFilter(_selectedFilter!, params: params);
-                    },
-                    onAuto: () {
-                      _applyFilterAuto(_selectedFilter!);
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        
-        // Botones de navegación
-        Padding(
-          padding: const EdgeInsets.all(24),
-          child: Row(
-            children: [
-              Expanded(
-                child: PrimaryButton(
-                  label: 'Atrás',
-                  variant: ButtonVariant.ghost,
-                  onPressed: () {
-                    _goToStep(1); // Volver a selección de filtros
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: PrimaryButton(
-                  label: 'Aplicar',
-                  onPressed: () {
-                    // Avanzar al paso 4 (descripción) después de aplicar
-                    _goToStep(3);
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Página 4: Descripción y publicar
+  /// Página 3: Descripción y publicar
   Widget _buildStep4Description() {
     return Padding(
       padding: const EdgeInsets.all(24),
