@@ -199,8 +199,6 @@ class _NewPostScreenState extends State<NewPostScreen> {
     );
 
     if (source == null) {
-      // Si se cancela, mostrar opción de cámara directamente
-      _openCamera();
       return;
     }
 
@@ -394,7 +392,8 @@ class _NewPostScreenState extends State<NewPostScreen> {
             _originalImage!,
             kernelSize: _toInt(params?['kernel_size']),
             biasValue: _toInt(params?['bias_value']),
-            useAuto: params?['use_auto'] as bool?,
+            // Siempre ejecutar con parámetros automáticos para emboss.
+            useAuto: true,
           );
           break;
         case 'watermark':
