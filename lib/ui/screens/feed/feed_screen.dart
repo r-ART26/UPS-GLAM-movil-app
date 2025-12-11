@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Para tipos de datos si es necesario (ej DocumentSnapshot implícitos)
 import '../../theme/typography.dart';
 import '../../theme/colors.dart';
 import '../../widgets/effects/gradient_background.dart';
 import '../../widgets/like_button.dart';
-import '../../../services/posts/feed_service.dart';
 import '../post/post_detail_screen.dart';
+import 'feed_controller.dart';
+import '../../../models/feed_post_model.dart';
 
-/// Pantalla principal (Feed) con integración a Firestore en Tiempo Real.
+/// Pantalla principal (Feed) con arquitectura separada (MVC) y Paginación.
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
 
@@ -17,6 +18,35 @@ class FeedScreen extends StatefulWidget {
 }
 
 class _FeedScreenState extends State<FeedScreen> {
+  late FeedController _controller;
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = FeedController();
+
+    // Escuchar cambios en el controlador para reconstruir la UI
+    _controller.addListener(() {
+      if (mounted) setState(() {});
+    });
+
+    // Listener para Scroll Infinito (Paginación)
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent - 200) {
+        _controller.loadMore();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -50,54 +80,13 @@ class _FeedScreenState extends State<FeedScreen> {
 
             const SizedBox(height: 12),
 
-            /// LISTA DE POSTS (STREAM REALTIME)
+            /// LISTA DE POSTS (CON PULL-TO-REFRESH Y PAGINACIÓN)
             Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: FeedService.getPostsStream(),
-                builder: (context, snapshot) {
-                  // 1. Cargando
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
-                      child: CircularProgressIndicator(color: Colors.white),
-                    );
-                  }
-
-                  // 2. Error
-                  if (snapshot.hasError) {
-                    return Center(
-                      child: Text(
-                        'Error al cargar posts: ${snapshot.error}',
-                        style: const TextStyle(color: Colors.white70),
-                      ),
-                    );
-                  }
-
-                  // 3. Datos vacíos
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        'No hay publicaciones aún.\n¡Sé el primero en postear!',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white70),
-                      ),
-                    );
-                  }
-
-                  final docs = snapshot.data!.docs;
-
-                  return ListView.builder(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    itemCount: docs.length,
-                    itemBuilder: (context, index) {
-                      final doc = docs[index];
-                      final data = doc.data() as Map<String, dynamic>;
-                      return _buildPostCard(context, data, doc.id);
-                    },
-                  );
-                },
+              child: RefreshIndicator(
+                onRefresh: _controller.refresh,
+                color: AppColors.upsBlue,
+                backgroundColor: Colors.white,
+                child: _buildBody(),
               ),
             ),
           ],
@@ -106,38 +95,73 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  Widget _buildPostCard(
-    BuildContext context,
-    Map<String, dynamic> post,
-    String docId,
-  ) {
-    // Extracción segura de datos (campos pos_*)
-    final imageUrl =
-        post['pos_imageUrl'] as String? ??
-        'https://via.placeholder.com/800x600?text=No+Image';
-    // Nota: La DB parece no tener username plano, usa authorUid.
-    // Usamos el UID para buscar el nombre en el widget
-    final authorUid = post['pos_authorUid'] as String? ?? '';
-    final caption = post['pos_caption'] as String? ?? '';
-    final likes = post['pos_likesCount'] as int? ?? 0;
-    final comments = post['pos_commentsCount'] as int? ?? 0;
-
-    // Manejo de Timestamp
-    String timeAgo = 'Reciente';
-    if (post['pos_timestamp'] != null) {
-      final timestamp = post['pos_timestamp'] as Timestamp;
-      timeAgo = _getTimeAgo(timestamp.toDate());
+  Widget _buildBody() {
+    // 1. Cargando inicial (solo si la lista está vacía)
+    if (_controller.isLoading && _controller.posts.isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.white),
+      );
     }
 
+    // 2. Datos vacíos (y no está cargando)
+    if (_controller.posts.isEmpty && !_controller.isLoading) {
+      return SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.5,
+          child: const Center(
+            child: Text(
+              'No hay publicaciones aún.\n¡Sé el primero en postear!',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white70),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 3. Lista con datos
+    return ListView.builder(
+      controller: _scrollController,
+      physics:
+          const AlwaysScrollableScrollPhysics(), // Permite refresh incluso con pocos items
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      itemCount: _controller.posts.length + 1, // +1 para el loader final
+      itemBuilder: (context, index) {
+        if (index < _controller.posts.length) {
+          final post = _controller.posts[index];
+          return _buildPostCard(context, post);
+        } else {
+          // Loader final de paginación
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Center(
+              child: _controller.hasMore
+                  ? const CircularProgressIndicator(
+                      color: Colors.white54,
+                      strokeWidth: 2,
+                    )
+                  : const Text(
+                      "Has llegado al final",
+                      style: TextStyle(color: Colors.white30),
+                    ),
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  Widget _buildPostCard(BuildContext context, FeedPost post) {
     return GestureDetector(
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (context) => PostDetailScreen(
-              postId: docId,
-              imageUrl: imageUrl,
-              description: caption,
-              authorUid: authorUid,
+              postId: post.id,
+              imageUrl: post.imageUrl,
+              description: post.caption,
+              authorUid: post.authorUid,
             ),
           ),
         );
@@ -153,7 +177,7 @@ class _FeedScreenState extends State<FeedScreen> {
           children: [
             // Imagen del post
             Hero(
-              tag: docId,
+              tag: post.id,
               child: ClipRRect(
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(18),
@@ -161,7 +185,7 @@ class _FeedScreenState extends State<FeedScreen> {
                 child: AspectRatio(
                   aspectRatio: 4 / 3,
                   child: Image.network(
-                    imageUrl,
+                    post.imageUrl,
                     fit: BoxFit.cover,
                     loadingBuilder: (context, child, loadingProgress) {
                       if (loadingProgress == null) return child;
@@ -202,14 +226,16 @@ class _FeedScreenState extends State<FeedScreen> {
                       // Nombre dinámico desde Firebase 'Users'
                       GestureDetector(
                         onTap: () {
-                          GoRouter.of(context).push('/profile/$authorUid');
+                          GoRouter.of(
+                            context,
+                          ).push('/profile/${post.authorUid}');
                         },
                         behavior: HitTestBehavior.opaque,
-                        child: _UserNameFetcher(uid: authorUid),
+                        child: _UserNameFetcher(uid: post.authorUid),
                       ),
 
                       Text(
-                        timeAgo,
+                        post.timeAgo,
                         style: const TextStyle(
                           color: Colors.white60,
                           fontSize: 12,
@@ -221,10 +247,13 @@ class _FeedScreenState extends State<FeedScreen> {
                   const SizedBox(height: 6),
 
                   // Descripción
-                  if (caption.isNotEmpty)
+                  if (post.caption.isNotEmpty)
                     Text(
-                      caption,
-                      style: const TextStyle(color: Colors.white70, fontSize: 14),
+                      post.caption,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
                     ),
 
                   const SizedBox(height: 8),
@@ -240,10 +269,10 @@ class _FeedScreenState extends State<FeedScreen> {
                           Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (context) => PostDetailScreen(
-                                postId: docId,
-                                imageUrl: imageUrl,
-                                description: caption,
-                                authorUid: authorUid,
+                                postId: post.id,
+                                imageUrl: post.imageUrl,
+                                description: post.caption,
+                                authorUid: post.authorUid,
                               ),
                             ),
                           );
@@ -257,38 +286,27 @@ class _FeedScreenState extends State<FeedScreen> {
                               size: 22,
                             ),
                             const SizedBox(width: 6),
-                            StreamBuilder<DocumentSnapshot>(
-                              stream: FirebaseFirestore.instance
-                                  .collection('Posts')
-                                  .doc(docId)
-                                  .snapshots(),
-                              builder: (context, postSnapshot) {
-                                int currentComments = comments;
-                                if (postSnapshot.hasData && postSnapshot.data != null) {
-                                  final data = postSnapshot.data!.data() as Map<String, dynamic>?;
-                                  if (data != null) {
-                                    currentComments = data['pos_commentsCount'] as int? ?? comments;
-                                  }
-                                }
-                                
-                                return Text(
-                                  '$currentComments',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                );
-                              },
+                            // Mantenemos Stream local solo para el contador en tiempo real si se desea,
+                            // o usamos el valor estático del modelo para eficiencia.
+                            // El usuario pidió separar lógica, así que usar el modelo es más "limpio".
+                            // Si se quiere realtime estricto en contadores, se debe mantener el Stream.
+                            // Por ahora usaremos el valor del modelo para cumplir con la optimización de recursos.
+                            Text(
+                              '${post.commentsCount}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      
+
                       // --- LIKES (Interactivo con animación) ---
                       LikeButton(
-                        postId: docId,
-                        initialLikesCount: likes,
+                        postId: post.id,
+                        initialLikesCount: post.likesCount,
                         iconSize: 22,
                         likedColor: Colors.redAccent,
                         unlikedColor: Colors.white70,
@@ -308,27 +326,10 @@ class _FeedScreenState extends State<FeedScreen> {
       ),
     );
   }
-
-  /// Utilidad simple para calcular tiempo relativo
-  String _getTimeAgo(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays > 7) {
-      return '${date.day}/${date.month}/${date.year}';
-    } else if (difference.inDays >= 1) {
-      return 'Hace ${difference.inDays} d';
-    } else if (difference.inHours >= 1) {
-      return 'Hace ${difference.inHours} h';
-    } else if (difference.inMinutes >= 1) {
-      return 'Hace ${difference.inMinutes} min';
-    } else {
-      return 'Hace un momento';
-    }
-  }
 }
 
 /// Widget pequeño para cargar el nombre de usuario bajo demanda
+/// (Podría moverse a un archivo aparte, pero se mantiene aquí por ahora como componente de UI puro)
 class _UserNameFetcher extends StatelessWidget {
   final String uid;
 
@@ -404,7 +405,6 @@ class _UserNameFetcher extends StatelessWidget {
           avatarImage = NetworkImage(photoUrl);
         } else {
           // Generar avatar con iniciales si no hay foto
-          // Usamos el azul UPS (003F87) de fondo y letras blancas
           final safeName = Uri.encodeComponent(name);
           avatarImage = NetworkImage(
             'https://ui-avatars.com/api/?name=$safeName&background=003F87&color=fff&size=150&bold=true',
@@ -418,7 +418,6 @@ class _UserNameFetcher extends StatelessWidget {
               radius: 14,
               backgroundColor: AppColors.upsBlue,
               backgroundImage: avatarImage,
-              // Ya no necesitamos child Icon porque siempre habrá imagen (real o generada)
             ),
 
             const SizedBox(width: 8),
