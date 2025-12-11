@@ -5,30 +5,34 @@ class RandomPostsService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   /// Stream reactivo de posts para mostrar en la cuadrícula de fotos.
-  /// Retorna solo las URLs de las imágenes.
-  /// 
-  /// Retorna un Stream<List<String>> con las URLs de las imágenes.
-  static Stream<List<String>> getRandomPostsStream() {
+  /// Retorna una lista de mapas con la información del post.
+  /// Cada mapa tiene: 'postId', 'imageUrl', 'description', 'authorUid'.
+  static Stream<List<Map<String, dynamic>>> getRandomPostsStream() {
     return _firestore
         .collection('Posts')
         .orderBy('pos_timestamp', descending: true)
         .limit(50) // Obtener últimos 50 posts
         .snapshots()
         .map((snapshot) {
-      List<String> imageUrls = [];
+          List<Map<String, dynamic>> posts = [];
 
-      for (var doc in snapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
-        final imageUrl = data['pos_imageUrl'] as String?;
-        if (imageUrl != null && imageUrl.isNotEmpty) {
-          imageUrls.add(imageUrl);
-        }
-      }
+          for (var doc in snapshot.docs) {
+            final data = doc.data();
+            final imageUrl = data['pos_imageUrl'] as String?;
 
-      // Mezclar aleatoriamente
-      imageUrls.shuffle();
-      return imageUrls;
-    });
+            if (imageUrl != null && imageUrl.isNotEmpty) {
+              posts.add({
+                'postId': doc.id,
+                'imageUrl': imageUrl,
+                'description': data['pos_caption'] ?? '',
+                'authorUid': data['pos_authorUid'] ?? '',
+              });
+            }
+          }
+
+          // Mezclar aleatoriamente
+          posts.shuffle();
+          return posts;
+        });
   }
 }
-
