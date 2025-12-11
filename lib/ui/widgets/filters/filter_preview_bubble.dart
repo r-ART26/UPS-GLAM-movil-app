@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../theme/colors.dart';
-import '../../../services/image/image_processing_service.dart';
 
 /// Widget circular que muestra una vista previa de un filtro aplicado.
 /// Similar a las burbujas de filtros de Instagram.
@@ -37,6 +37,16 @@ class _FilterPreviewBubbleState extends State<FilterPreviewBubble>
   bool _hasError = false;
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
+  static const Map<String, String> _previewAssets = {
+    'original': 'lib/ui/screens/post/images/Original.png',
+    'canny': 'lib/ui/screens/post/images/canny_.png',
+    'gaussian': 'lib/ui/screens/post/images/gaussian.png',
+    'negative': 'lib/ui/screens/post/images/negative.png',
+    'emboss': 'lib/ui/screens/post/images/emboss.png',
+    'watermark': 'lib/ui/screens/post/images/watermark.png',
+    'ripple': 'lib/ui/screens/post/images/ripple.png',
+    'collage': 'lib/ui/screens/post/images/collage.png',
+  };
 
   @override
   void initState() {
@@ -84,66 +94,16 @@ class _FilterPreviewBubbleState extends State<FilterPreviewBubble>
 
     try {
       Uint8List? result;
+      final filterKey = widget.filterKey.toLowerCase();
+      final assetPath = _previewAssets[filterKey];
 
-      switch (widget.filterKey.toLowerCase()) {
-        case 'original':
-          // Para original, leer los bytes directamente
-          result = await widget.originalImage.readAsBytes();
-          break;
-        case 'canny':
-          result = await ImageProcessingService.applyCanny(
-            widget.originalImage,
-            kernelSize: 5,
-            sigma: 2,
-            lowThreshold: '0',
-            highThreshold: '0',
-            useAuto: true,
-          );
-          break;
-        case 'gaussian':
-          result = await ImageProcessingService.applyGaussian(
-            widget.originalImage,
-            kernelSize: 15,
-            sigma: 5,
-            useAuto: true,
-          );
-          break;
-        case 'negative':
-          result = await ImageProcessingService.applyNegative(
-            widget.originalImage,
-          );
-          break;
-        case 'emboss':
-          result = await ImageProcessingService.applyEmboss(
-            widget.originalImage,
-            kernelSize: 3,
-            biasValue: 128,
-            useAuto: true,
-          );
-          break;
-        case 'watermark':
-          result = await ImageProcessingService.applyWatermark(
-            widget.originalImage,
-            scale: 0.3,
-            transparency: 0.3,
-            spacing: 0.5,
-          );
-          break;
-        case 'ripple':
-          result = await ImageProcessingService.applyRipple(
-            widget.originalImage,
-            edgeThreshold: 100,
-            colorLevels: 8,
-            saturation: 1.2,
-          );
-          break;
-        case 'collage':
-          result = await ImageProcessingService.applyCollage(
-            widget.originalImage,
-          );
-          break;
-        default:
-          result = await widget.originalImage.readAsBytes();
+      if (assetPath != null) {
+        // Usa la imagen local para evitar llamadas al endpoint al mostrar burbujas
+        final data = await rootBundle.load(assetPath);
+        result = data.buffer.asUint8List();
+      } else {
+        // Fallback: muestra la imagen original si no hay asset mapeado
+        result = await widget.originalImage.readAsBytes();
       }
 
       if (mounted) {
