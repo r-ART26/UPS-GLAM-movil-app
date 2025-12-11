@@ -7,7 +7,8 @@ import '../../../services/image/image_processing_service.dart';
 /// Widget circular que muestra una vista previa de un filtro aplicado.
 /// Similar a las burbujas de filtros de Instagram.
 class FilterPreviewBubble extends StatefulWidget {
-  final String filterName;
+  final String filterKey;
+  final String filterLabel;
   final IconData icon;
   final File originalImage;
   final bool isSelected;
@@ -16,7 +17,8 @@ class FilterPreviewBubble extends StatefulWidget {
 
   const FilterPreviewBubble({
     super.key,
-    required this.filterName,
+    required this.filterKey,
+    required this.filterLabel,
     required this.icon,
     required this.originalImage,
     required this.isSelected,
@@ -52,6 +54,10 @@ class _FilterPreviewBubbleState extends State<FilterPreviewBubble>
   @override
   void didUpdateWidget(FilterPreviewBubble oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.originalImage.path != widget.originalImage.path ||
+        oldWidget.filterKey != widget.filterKey) {
+      _loadPreview();
+    }
     if (oldWidget.isSelected != widget.isSelected) {
       if (widget.isSelected) {
         _animationController.forward();
@@ -79,7 +85,7 @@ class _FilterPreviewBubbleState extends State<FilterPreviewBubble>
     try {
       Uint8List? result;
 
-      switch (widget.filterName.toLowerCase()) {
+      switch (widget.filterKey.toLowerCase()) {
         case 'original':
           // Para original, leer los bytes directamente
           result = await widget.originalImage.readAsBytes();
@@ -200,7 +206,7 @@ class _FilterPreviewBubbleState extends State<FilterPreviewBubble>
           const SizedBox(height: 8),
           // Nombre del filtro
           Text(
-            widget.filterName,
+            widget.filterLabel,
             style: TextStyle(
               color: widget.isSelected
                   ? AppColors.upsYellow

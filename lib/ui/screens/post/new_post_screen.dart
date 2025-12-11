@@ -16,7 +16,13 @@ import '../../../services/image/image_processing_service.dart';
 import '../../../services/posts/post_service.dart';
 
 class NewPostScreen extends StatefulWidget {
-  const NewPostScreen({super.key});
+  const NewPostScreen({
+    super.key,
+    this.autoLoadTempImage = false,
+  });
+
+  /// Si viene desde el botón de cámara del feed, cargamos la imagen temporal.
+  final bool autoLoadTempImage;
 
   @override
   State<NewPostScreen> createState() => _NewPostScreenState();
@@ -32,6 +38,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
   File? _originalImage;
   Uint8List? _originalImageBytes;
   Uint8List? _processedImage;
+  /// Guarda el "key" interno del filtro seleccionado (ej: 'canny').
   String? _selectedFilter;
   Map<String, dynamic> _filterParams = {};
   bool _isProcessing = false;
@@ -41,15 +48,23 @@ class _NewPostScreenState extends State<NewPostScreen> {
 
   // Definición de filtros disponibles
   final List<Map<String, dynamic>> _filters = [
-    {'name': 'Original', 'icon': Icons.image, 'hasParams': false},
-    {'name': 'Canny', 'icon': Icons.auto_fix_high, 'hasParams': true},
-    {'name': 'Gaussian', 'icon': Icons.blur_on, 'hasParams': true},
-    {'name': 'Negative', 'icon': Icons.invert_colors, 'hasParams': false},
-    {'name': 'Emboss', 'icon': Icons.texture, 'hasParams': true},
-    {'name': 'Watermark', 'icon': Icons.water_drop, 'hasParams': true},
-    {'name': 'Ripple', 'icon': Icons.waves, 'hasParams': true},
-    {'name': 'Collage', 'icon': Icons.grid_view, 'hasParams': false},
+    {'key': 'original', 'label': 'Original', 'icon': Icons.image, 'hasParams': false},
+    {'key': 'canny', 'label': 'Detección de Bordes', 'icon': Icons.auto_fix_high, 'hasParams': true},
+    {'key': 'gaussian', 'label': 'Desenfoque', 'icon': Icons.blur_on, 'hasParams': true},
+    {'key': 'negative', 'label': 'Invertir Colores', 'icon': Icons.invert_colors, 'hasParams': false},
+    {'key': 'emboss', 'label': 'Grabado en Relieve', 'icon': Icons.texture, 'hasParams': true},
+    {'key': 'watermark', 'label': 'Sellado UPS', 'icon': Icons.water_drop, 'hasParams': true},
+    {'key': 'ripple', 'label': 'Cómic', 'icon': Icons.waves, 'hasParams': true},
+    {'key': 'collage', 'label': 'Collage', 'icon': Icons.grid_view, 'hasParams': false},
   ];
+
+  String _getFilterLabel(String key) {
+    final match = _filters.cast<Map<String, dynamic>?>().firstWhere(
+          (f) => f?['key'] == key,
+          orElse: () => null,
+        );
+    return (match?['label'] as String?) ?? key;
+  }
 
   // Frases predeterminadas para descripción
   final List<String> _suggestedCaptions = [
@@ -76,9 +91,17 @@ class _NewPostScreenState extends State<NewPostScreen> {
     
     // Verificar si hay una imagen temporal (desde el feed con cámara)
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.delayed(const Duration(milliseconds: 300), () {
-        if (mounted) {
-          _checkForTempImage();
+      Future.delayed(const Duration(milliseconds: 300), () async {
+        if (!mounted) return;
+
+        if (widget.autoLoadTempImage) {
+          await _checkForTempImage();
+        } else {
+          // Si entramos desde la pestaña normal, limpiamos cualquier imagen previa.
+          await TempImageService.clearTempImage();
+          if (mounted) {
+            _showImageSourceDialog();
+          }
         }
       });
     });
@@ -94,10 +117,10 @@ class _NewPostScreenState extends State<NewPostScreen> {
         _originalImage = tempImage;
         _originalImageBytes = imageBytes;
         _processedImage = null;
-        _selectedFilter = 'Original';
+        _selectedFilter = 'original';
       });
       // Aplicar filtro "Original" y avanzar a la página de filtros
-      _applyFilter('Original');
+      _applyFilter('original');
       _goToStep(1);
     } else {
       // No hay imagen temporal, mostrar diálogo de selección
@@ -112,6 +135,8 @@ class _NewPostScreenState extends State<NewPostScreen> {
     _captionController.dispose();
     _captionFocusNode.dispose();
     _pageController.dispose();
+    // Limpia cualquier imagen temporal al salir.
+    TempImageService.clearTempImage();
     super.dispose();
   }
 
@@ -224,10 +249,10 @@ class _NewPostScreenState extends State<NewPostScreen> {
           _originalImage = tempFile;
           _originalImageBytes = imageBytes;
           _processedImage = null;
-          _selectedFilter = 'Original'; // Establecer "Original" como filtro por defecto
+          _selectedFilter = 'original'; // Establecer "Original" como filtro por defecto
         });
         // Aplicar filtro "Original" automáticamente
-        _applyFilter('Original');
+        _applyFilter('original');
         // Avanzar a la página de filtros
         _goToStep(1);
       } else {
@@ -437,23 +462,23 @@ class _NewPostScreenState extends State<NewPostScreen> {
   }
 
   /// Maneja la selección de un filtro
-  void _onFilterSelected(String filterName) {
-    final filter = _filters.firstWhere((f) => f['name'] == filterName);
+  void _onFilterSelected(String filterKey) {
+    final filter = _filters.firstWhere((f) => f['key'] == filterKey);
     final hasParams = filter['hasParams'] as bool;
 
     if (hasParams) {
-      _initializeFilterParams(filterName);
+      _initializeFilterParams(filterKey);
       setState(() {
-        _selectedFilter = filterName;
+        _selectedFilter = filterKey;
       });
       // Ir a página de parámetros
       _goToStep(2);
     } else {
       // Aplicar filtro directamente (incluye "Original")
       setState(() {
-        _selectedFilter = filterName;
+        _selectedFilter = filterKey;
       });
-      _applyFilter(filterName);
+      _applyFilter(filterKey);
     }
   }
 
@@ -702,19 +727,22 @@ class _NewPostScreenState extends State<NewPostScreen> {
                   itemCount: _filters.length,
                   itemBuilder: (context, index) {
                     final filter = _filters[index];
-                    final filterName = filter['name'] as String;
-                    final isSelected = _selectedFilter == filterName ||
-                        (filterName == 'Original' && _selectedFilter == null && _processedImage == null);
+                    final filterKey = filter['key'] as String;
+                    final filterLabel = filter['label'] as String;
+                    final isSelected = _selectedFilter == null
+                        ? filterKey == 'original'
+                        : _selectedFilter == filterKey;
                     
                     return Padding(
                       padding: const EdgeInsets.only(right: 16),
                       child: FilterPreviewBubble(
-                        filterName: filterName,
+                        filterKey: filterKey,
+                        filterLabel: filterLabel,
                         icon: filter['icon'] as IconData,
                         originalImage: _originalImage!,
                         isSelected: isSelected,
                         hasParams: filter['hasParams'] as bool,
-                        onTap: () => _onFilterSelected(filterName),
+                        onTap: () => _onFilterSelected(filterKey),
                       ),
                     );
                   },
@@ -788,7 +816,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Parámetros: $_selectedFilter',
+                    'Parámetros: ${_getFilterLabel(_selectedFilter!)}',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,

@@ -40,7 +40,7 @@ class _FeedScreenState extends State<FeedScreen> {
         
         if (tempFile != null && mounted) {
           // Navegar a la pantalla de nuevo post
-          context.go('/home/post/new');
+          context.go('/home/post/new', extra: true);
         } else {
           if (mounted) {
             await ErrorDialog.show(
