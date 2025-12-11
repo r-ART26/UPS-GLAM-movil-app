@@ -1,11 +1,15 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../theme/typography.dart';
 import '../../theme/colors.dart';
 import '../../widgets/effects/gradient_background.dart';
 import '../../widgets/like_button.dart';
+import '../../widgets/dialogs/error_dialog.dart';
 import '../../../services/posts/feed_service.dart';
+import '../../../services/image/temp_image_service.dart';
 import '../post/post_detail_screen.dart';
 
 /// Pantalla principal (Feed) con integración a Firestore en Tiempo Real.
@@ -17,6 +21,47 @@ class FeedScreen extends StatefulWidget {
 }
 
 class _FeedScreenState extends State<FeedScreen> {
+  final ImagePicker _imagePicker = ImagePicker();
+
+  /// Abre la cámara directamente y navega a la pantalla de nuevo post
+  Future<void> _openCameraForPost() async {
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+        preferredCameraDevice: CameraDevice.rear,
+      );
+
+      if (pickedFile != null) {
+        final file = File(pickedFile.path);
+        
+        // Guardar imagen temporalmente
+        final tempFile = await TempImageService.saveOriginalImage(file);
+        
+        if (tempFile != null && mounted) {
+          // Navegar a la pantalla de nuevo post
+          context.go('/home/post/new');
+        } else {
+          if (mounted) {
+            await ErrorDialog.show(
+              context,
+              title: 'Error',
+              message: 'Error al guardar la imagen. Por favor, intenta nuevamente.',
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        await ErrorDialog.show(
+          context,
+          title: 'Error al abrir cámara',
+          message: 'Ocurrió un error al abrir la cámara: ${e.toString()}',
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -40,14 +85,11 @@ class _FeedScreenState extends State<FeedScreen> {
                     ],
                   ),
 
-                  // Botón de recargar manual (útil si hay error de red)
-                  // Opcional, ya que es realtime
+                  // Botón de cámara para tomar foto directamente
                   IconButton(
-                    onPressed: () {
-                      // Acción futura: Scroll to top
-                    },
+                    onPressed: _openCameraForPost,
                     icon: const Icon(
-                      Icons.camera_alt_outlined, // Placeholder para cámara
+                      Icons.camera_alt_outlined,
                       color: Colors.white,
                       size: 26,
                     ),

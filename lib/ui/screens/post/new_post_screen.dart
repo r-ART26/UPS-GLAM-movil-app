@@ -66,14 +66,6 @@ class _NewPostScreenState extends State<NewPostScreen> {
   @override
   void initState() {
     super.initState();
-    // Auto-abrir image picker después de un pequeño delay
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.delayed(const Duration(milliseconds: 300), () {
-        if (mounted) {
-          _showImageSourceDialog();
-        }
-      });
-    });
     
     // Escuchar cambios en el foco del campo de texto
     _captionFocusNode.addListener(() {
@@ -81,6 +73,38 @@ class _NewPostScreenState extends State<NewPostScreen> {
         _isKeyboardVisible = _captionFocusNode.hasFocus;
       });
     });
+    
+    // Verificar si hay una imagen temporal (desde el feed con cámara)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) {
+          _checkForTempImage();
+        }
+      });
+    });
+  }
+
+  /// Verifica si hay una imagen temporal y la carga automáticamente
+  Future<void> _checkForTempImage() async {
+    final tempImage = await TempImageService.getOriginalImage();
+    if (tempImage != null && mounted) {
+      // Hay una imagen temporal, cargarla y avanzar a filtros
+      final imageBytes = await tempImage.readAsBytes();
+      setState(() {
+        _originalImage = tempImage;
+        _originalImageBytes = imageBytes;
+        _processedImage = null;
+        _selectedFilter = 'Original';
+      });
+      // Aplicar filtro "Original" y avanzar a la página de filtros
+      _applyFilter('Original');
+      _goToStep(1);
+    } else {
+      // No hay imagen temporal, mostrar diálogo de selección
+      if (mounted) {
+        _showImageSourceDialog();
+      }
+    }
   }
 
   @override
