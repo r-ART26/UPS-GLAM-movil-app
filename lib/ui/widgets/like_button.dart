@@ -162,10 +162,13 @@ class _LikeButtonState extends State<LikeButton>
 
     return GestureDetector(
       onTap: _handleLikeToggle,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          StreamBuilder<DocumentSnapshot>(
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            StreamBuilder<DocumentSnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('Posts')
                 .doc(widget.postId)
@@ -254,7 +257,8 @@ class _LikeButtonState extends State<LikeButton>
               },
             ),
           ],
-        ],
+          ],
+        ),
       ),
     );
   }

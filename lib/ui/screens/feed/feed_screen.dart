@@ -1,11 +1,15 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../theme/typography.dart';
 import '../../theme/colors.dart';
 import '../../widgets/effects/gradient_background.dart';
 import '../../widgets/like_button.dart';
+import '../../widgets/dialogs/error_dialog.dart';
 import '../../../services/posts/feed_service.dart';
+import '../../../services/image/temp_image_service.dart';
 import '../post/post_detail_screen.dart';
 
 /// Pantalla principal (Feed) con integración a Firestore en Tiempo Real.
@@ -17,6 +21,47 @@ class FeedScreen extends StatefulWidget {
 }
 
 class _FeedScreenState extends State<FeedScreen> {
+  final ImagePicker _imagePicker = ImagePicker();
+
+  /// Abre la cámara directamente y navega a la pantalla de nuevo post
+  Future<void> _openCameraForPost() async {
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+        preferredCameraDevice: CameraDevice.rear,
+      );
+
+      if (pickedFile != null) {
+        final file = File(pickedFile.path);
+        
+        // Guardar imagen temporalmente
+        final tempFile = await TempImageService.saveOriginalImage(file);
+        
+        if (tempFile != null && mounted) {
+          // Navegar a la pantalla de nuevo post
+          context.go('/home/post/new');
+        } else {
+          if (mounted) {
+            await ErrorDialog.show(
+              context,
+              title: 'Error',
+              message: 'Error al guardar la imagen. Por favor, intenta nuevamente.',
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        await ErrorDialog.show(
+          context,
+          title: 'Error al abrir cámara',
+          message: 'Ocurrió un error al abrir la cámara: ${e.toString()}',
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -40,14 +85,11 @@ class _FeedScreenState extends State<FeedScreen> {
                     ],
                   ),
 
-                  // Botón de recargar manual (útil si hay error de red)
-                  // Opcional, ya que es realtime
+                  // Botón de cámara para tomar foto directamente
                   IconButton(
-                    onPressed: () {
-                      // Acción futura: Scroll to top
-                    },
+                    onPressed: _openCameraForPost,
                     icon: const Icon(
-                      Icons.camera_alt_outlined, // Placeholder para cámara
+                      Icons.camera_alt_outlined,
                       color: Colors.white,
                       size: 26,
                     ),
@@ -146,30 +188,30 @@ class _FeedScreenState extends State<FeedScreen> {
       timeAgo = _getTimeAgo(timestamp.toDate());
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Colors.white.withAlpha(25),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Imagen del post - Tapa para ver detalles
-          GestureDetector(
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => PostDetailScreen(
-                    postId: docId,
-                    imageUrl: imageUrl,
-                    description: caption,
-                    authorUid: authorUid,
-                  ),
-                ),
-              );
-            },
-            child: Hero(
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => PostDetailScreen(
+              postId: docId,
+              imageUrl: imageUrl,
+              description: caption,
+              authorUid: authorUid,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: Colors.white.withAlpha(25),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Imagen del post
+            Hero(
               tag: docId,
               child: ClipRRect(
                 borderRadius: const BorderRadius.vertical(
@@ -205,122 +247,123 @@ class _FeedScreenState extends State<FeedScreen> {
                 ),
               ),
             ),
-          ),
 
-          // Contenido textual
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Usuario + fecha
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Nombre dinámico desde Firebase 'Users'
-                    // Nombre dinámico desde Firebase 'Users'
-                    GestureDetector(
-                      onTap: () {
-                        GoRouter.of(context).push('/profile/$authorUid');
-                      },
-                      child: _UserNameFetcher(uid: authorUid),
-                    ),
-
-                    Text(
-                      timeAgo,
-                      style: const TextStyle(
-                        color: Colors.white60,
-                        fontSize: 12,
+            // Contenido textual
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Usuario + fecha
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Nombre dinámico desde Firebase 'Users'
+                      GestureDetector(
+                        onTap: () {
+                          GoRouter.of(context).push('/profile/$authorUid');
+                        },
+                        behavior: HitTestBehavior.opaque,
+                        child: _UserNameFetcher(uid: authorUid),
                       ),
-                    ),
-                  ],
-                ),
 
-                const SizedBox(height: 6),
-
-                // Descripción
-                if (caption.isNotEmpty)
-                  Text(
-                    caption,
-                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                      Text(
+                        timeAgo,
+                        style: const TextStyle(
+                          color: Colors.white60,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
 
-                const SizedBox(height: 8),
+                  const SizedBox(height: 6),
 
-                // Barra de Acciones: Likes y Comentarios
-                Row(
-                  children: [
-                    // --- LIKES (Interactivo con animación) ---
-                    LikeButton(
-                      postId: docId,
-                      initialLikesCount: likes,
-                      iconSize: 22,
-                      likedColor: Colors.redAccent,
-                      unlikedColor: Colors.white70,
-                      countStyle: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
+                  // Descripción
+                  if (caption.isNotEmpty)
+                    Text(
+                      caption,
+                      style: const TextStyle(color: Colors.white70, fontSize: 14),
                     ),
 
-                    const SizedBox(width: 24), // Espacio entre grupos
-                    // --- COMENTARIOS (Interactivo) ---
-                    GestureDetector(
-                      onTap: () {
-                        // Navegar a la pantalla de detalle del post
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => PostDetailScreen(
-                              postId: docId,
-                              imageUrl: imageUrl,
-                              description: caption,
-                              authorUid: authorUid,
+                  const SizedBox(height: 8),
+
+                  // Barra de Acciones: Comentarios y Likes
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // --- COMENTARIOS (Interactivo) ---
+                      GestureDetector(
+                        onTap: () {
+                          // Navegar a la pantalla de detalle del post
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => PostDetailScreen(
+                                postId: docId,
+                                imageUrl: imageUrl,
+                                description: caption,
+                                authorUid: authorUid,
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.chat_bubble_outline,
-                            color: Colors.white70,
-                            size: 22,
-                          ),
-                          const SizedBox(width: 6),
-                          StreamBuilder<DocumentSnapshot>(
-                            stream: FirebaseFirestore.instance
-                                .collection('Posts')
-                                .doc(docId)
-                                .snapshots(),
-                            builder: (context, postSnapshot) {
-                              int currentComments = comments;
-                              if (postSnapshot.hasData && postSnapshot.data != null) {
-                                final data = postSnapshot.data!.data() as Map<String, dynamic>?;
-                                if (data != null) {
-                                  currentComments = data['pos_commentsCount'] as int? ?? comments;
+                          );
+                        },
+                        behavior: HitTestBehavior.opaque,
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.chat_bubble_outline,
+                              color: Colors.white70,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 6),
+                            StreamBuilder<DocumentSnapshot>(
+                              stream: FirebaseFirestore.instance
+                                  .collection('Posts')
+                                  .doc(docId)
+                                  .snapshots(),
+                              builder: (context, postSnapshot) {
+                                int currentComments = comments;
+                                if (postSnapshot.hasData && postSnapshot.data != null) {
+                                  final data = postSnapshot.data!.data() as Map<String, dynamic>?;
+                                  if (data != null) {
+                                    currentComments = data['pos_commentsCount'] as int? ?? comments;
+                                  }
                                 }
-                              }
-                              
-                              return Text(
-                                '$currentComments',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              );
-                            },
-                          ),
-                        ],
+                                
+                                return Text(
+                                  '$currentComments',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                      
+                      // --- LIKES (Interactivo con animación) ---
+                      LikeButton(
+                        postId: docId,
+                        initialLikesCount: likes,
+                        iconSize: 22,
+                        likedColor: Colors.redAccent,
+                        unlikedColor: Colors.white70,
+                        countStyle: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
