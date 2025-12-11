@@ -199,8 +199,6 @@ class _NewPostScreenState extends State<NewPostScreen> {
     );
 
     if (source == null) {
-      // Si se cancela, mostrar opción de cámara directamente
-      _openCamera();
       return;
     }
 
