@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../theme/typography.dart';
@@ -25,6 +26,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   late final ProfileController _controller;
+  final GlobalKey _settingsButtonKey = GlobalKey(); // Key para el botón
 
   @override
   void initState() {
@@ -92,7 +94,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           // Solo mostrar configuración si es MI perfil
           if (_controller.isMyProfile)
             IconButton(
-              onPressed: () => _showSettingsDialog(context),
+              key: _settingsButtonKey, // Agregar Key para obtener posición
+              onPressed: () =>
+                  _showSettingsMenu(context), // Cambiar nombre de función
               icon: const Icon(
                 Icons.settings_outlined,
                 color: Colors.white,
@@ -320,79 +324,149 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  /// DIÁLOGO DE CONFIGURACIÓN
-  void _showSettingsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          backgroundColor: AppColors.darkBackground,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text(
-            'Configuración',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.edit, color: Colors.white),
-                title: const Text(
-                  'Editar perfil',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                onTap: () async {
-                  Navigator.of(dialogContext).pop(); // Cerrar dialog
-                  final user = _controller.user;
-                  if (user == null) return;
+  /// MENÚ DE CONFIGURACIÓN (TIPO POPUP)
+  void _showSettingsMenu(BuildContext context) {
+    final RenderBox renderBox =
+        _settingsButtonKey.currentContext!.findRenderObject() as RenderBox;
+    final Offset offset = renderBox.localToGlobal(Offset.zero);
+    final Size size = renderBox.size;
 
-                  final result = await Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => EditProfileScreen(
-                        currentName: user.username,
-                        currentBio: user.bio ?? '',
-                        currentPhotoUrl: user.photoUrl,
+    // Calcular la posición (esquina superior derecha alineada con el botón)
+    final double left =
+        offset.dx - 220 + size.width; // Ancho del menú aprox 220
+    final double top = offset.dy + size.height + 8;
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Cerrar configuración',
+      barrierColor: Colors.black26, // Fondo más sutil
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (_, __, ___) => const SizedBox(),
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return Stack(
+          children: [
+            Positioned(
+              left: left,
+              top: top,
+              child: Material(
+                color: Colors.transparent,
+                child: FadeTransition(
+                  opacity: animation,
+                  child: ScaleTransition(
+                    alignment: Alignment.topRight,
+                    scale: Tween<double>(begin: 0.9, end: 1.0).animate(
+                      CurvedAnimation(parent: animation, curve: Curves.easeOut),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: BackdropFilter(
+                        filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                        child: Container(
+                          width: 220,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.darkBackground.withOpacity(0.85),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.white12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.4),
+                                blurRadius: 20,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min, // Ajuste importante
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Botón Editar Perfil
+                              InkWell(
+                                onTap: () async {
+                                  Navigator.of(context).pop();
+                                  final user = _controller.user;
+                                  if (user == null) return;
+                                  final result = await Navigator.of(context)
+                                      .push(
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              EditProfileScreen(
+                                                currentName: user.username,
+                                                currentBio: user.bio ?? '',
+                                                currentPhotoUrl: user.photoUrl,
+                                              ),
+                                        ),
+                                      );
+                                  if (result == true) {
+                                    await _controller.loadProfile();
+                                  }
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
+                                  child: Row(
+                                    children: const [
+                                      Icon(
+                                        Icons.edit_outlined,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                      SizedBox(width: 12),
+                                      Text(
+                                        'Editar perfil',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+
+                              const Divider(height: 1, color: Colors.white12),
+
+                              // Botón Cerrar Sesión
+                              InkWell(
+                                onTap: () async {
+                                  Navigator.of(context).pop();
+                                  await _handleLogout(context);
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
+                                  child: Row(
+                                    children: const [
+                                      Icon(
+                                        Icons.logout_rounded,
+                                        color: Colors.redAccent,
+                                        size: 20,
+                                      ),
+                                      SizedBox(width: 12),
+                                      Text(
+                                        'Cerrar sesión',
+                                        style: TextStyle(
+                                          color: Colors.redAccent,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                  );
-
-                  if (result == true) {
-                    await _controller.loadProfile(); // Recargar datos
-                  }
-                },
-              ),
-              const Divider(color: Colors.white24),
-              ListTile(
-                leading: const Icon(Icons.logout, color: Colors.redAccent),
-                title: const Text(
-                  'Cerrar sesión',
-                  style: TextStyle(
-                    color: Colors.redAccent,
-                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                onTap: () async {
-                  Navigator.of(dialogContext).pop();
-                  await _handleLogout(context);
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text(
-                'Cancelar',
-                style: TextStyle(color: Colors.white70),
               ),
             ),
           ],
