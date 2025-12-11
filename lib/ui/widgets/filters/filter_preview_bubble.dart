@@ -126,58 +126,63 @@ class _FilterPreviewBubbleState extends State<FilterPreviewBubble>
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: widget.onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Burbuja circular con preview
-          AnimatedBuilder(
-            animation: _scaleAnimation,
-            builder: (context, child) {
-              return Transform.scale(
-                scale: widget.isSelected ? _scaleAnimation.value : 1.0,
-                child: Container(
-                  width: 90,
-                  height: 90,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: widget.isSelected
-                          ? AppColors.upsYellow
-                          : Colors.white.withOpacity(0.3),
-                      width: widget.isSelected ? 3 : 2,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Burbuja circular con preview
+            AnimatedBuilder(
+              animation: _scaleAnimation,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: widget.isSelected ? _scaleAnimation.value : 1.0,
+                  child: Container(
+                    width: 90,
+                    height: 90,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: widget.isSelected
+                            ? AppColors.upsYellow
+                            : Colors.white.withOpacity(0.3),
+                        width: widget.isSelected ? 3 : 2,
+                      ),
+                      boxShadow: widget.isSelected
+                          ? [
+                              BoxShadow(
+                                color: AppColors.upsYellow.withOpacity(0.3),
+                                blurRadius: 8,
+                                spreadRadius: 2,
+                              ),
+                            ]
+                          : null,
                     ),
-                    boxShadow: widget.isSelected
-                        ? [
-                            BoxShadow(
-                              color: AppColors.upsYellow.withOpacity(0.3),
-                              blurRadius: 8,
-                              spreadRadius: 2,
-                            ),
-                          ]
-                        : null,
+                    child: ClipOval(
+                      clipBehavior: Clip.antiAlias,
+                      child: _buildPreviewContent(),
+                    ),
                   ),
-                  child: ClipOval(
-                    child: _buildPreviewContent(),
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 8),
-          // Nombre del filtro
-          Text(
-            widget.filterLabel,
-            style: TextStyle(
-              color: widget.isSelected
-                  ? AppColors.upsYellow
-                  : Colors.white.withOpacity(0.8),
-              fontSize: 12,
-              fontWeight: widget.isSelected ? FontWeight.w600 : FontWeight.w500,
+                );
+              },
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+            const SizedBox(height: 8),
+            // Nombre del filtro
+            Text(
+              widget.filterLabel,
+              style: TextStyle(
+                color: widget.isSelected
+                    ? AppColors.upsYellow
+                    : Colors.white.withOpacity(0.8),
+                fontSize: 12,
+                fontWeight:
+                    widget.isSelected ? FontWeight.w600 : FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }
