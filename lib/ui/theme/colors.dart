@@ -27,6 +27,9 @@ class AppColors {
   // === UI ELEMENTS ===
   static const Color glassWhite = Color(0x1AFFFFFF); // 10% White for glass
   static const Color glassBorder = Color(0x33FFFFFF); // 20% White for borders
+
+  static const Color cardBackground = Color(0xFF1E293B);
+  static const Color inputBackground = Color(0xFF1E293B);
 }
 
 /// Gradientes Globales
