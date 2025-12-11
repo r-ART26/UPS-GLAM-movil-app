@@ -28,18 +28,19 @@ class PostDetailScreen extends StatefulWidget {
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
   final TextEditingController _commentController = TextEditingController();
-  String _currentUserName =
-      'Usuario'; // Nombre por defecto para el avatar propio
+  String _currentUserName = 'Usuario';
+  String? _currentUserPhotoUrl; // Foto del usuario actual
 
   bool _isPostingComment = false;
-  bool _isComposing = false; // Estado para saber si hay texto
+  bool _isComposing = false;
   String? _currentUserId;
 
   @override
   void initState() {
     super.initState();
     _loadCurrentUser();
-    _loadCurrentUserId();
+    // _loadCurrentUserId ya no es estrictamente necesario si hacemos todo en _loadCurrentUser,
+    // pero lo dejamos para no romper nada que dependa de _currentUserId pronto.
     _commentController.addListener(() {
       setState(() {
         _isComposing = _commentController.text.trim().isNotEmpty;
@@ -48,20 +49,26 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   }
 
   Future<void> _loadCurrentUser() async {
-    final name = await AuthService.getUserName();
-    if (name != null && mounted) {
-      setState(() {
-        _currentUserName = name;
-      });
-    }
-  }
+    final uid = await AuthService.getUserId();
+    if (uid != null) {
+      if (mounted) setState(() => _currentUserId = uid);
 
-  Future<void> _loadCurrentUserId() async {
-    final userId = await AuthService.getUserId();
-    if (mounted) {
-      setState(() {
-        _currentUserId = userId;
-      });
+      try {
+        // Obtener datos frescos de Firestore para tener la foto más reciente
+        final doc = await FirebaseFirestore.instance
+            .collection('Users')
+            .doc(uid)
+            .get();
+        if (doc.exists && mounted) {
+          final data = doc.data()!;
+          setState(() {
+            _currentUserName = data['usr_username'] as String? ?? 'Usuario';
+            _currentUserPhotoUrl = data['usr_photoUrl'] as String?;
+          });
+        }
+      } catch (e) {
+        debugPrint('Error cargando usuario actual: $e');
+      }
     }
   }
 
@@ -230,9 +237,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 CircleAvatar(
                   radius: 16,
                   backgroundColor: AppColors.upsBlue,
-                  backgroundImage: NetworkImage(
-                    'https://ui-avatars.com/api/?name=${Uri.encodeComponent(_currentUserName)}&background=003F87&color=fff&size=150&bold=true',
-                  ),
+                  backgroundImage:
+                      (_currentUserPhotoUrl != null &&
+                          _currentUserPhotoUrl!.isNotEmpty)
+                      ? NetworkImage(_currentUserPhotoUrl!)
+                      : NetworkImage(
+                          'https://ui-avatars.com/api/?name=${Uri.encodeComponent(_currentUserName)}&background=003F87&color=fff&size=150&bold=true',
+                        ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
