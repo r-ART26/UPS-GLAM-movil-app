@@ -200,8 +200,10 @@ class _NewPostScreenState extends State<NewPostScreen> {
           _originalImage = tempFile;
           _originalImageBytes = imageBytes;
           _processedImage = null;
-          _selectedFilter = null;
+          _selectedFilter = 'Original'; // Establecer "Original" como filtro por defecto
         });
+        // Aplicar filtro "Original" automáticamente
+        _applyFilter('Original');
         // Avanzar a la página de filtros
         _goToStep(1);
       } else {
