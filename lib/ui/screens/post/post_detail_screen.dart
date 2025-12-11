@@ -244,6 +244,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Espacio para la AppBar transparente (SafeArea manual)
+                    SizedBox(
+                      height:
+                          kToolbarHeight + MediaQuery.of(context).padding.top,
+                    ),
+
                     // Imagen Hero (Animación suave desde el feed)
                     // Imagen Hero (con Zoom)
                     GestureDetector(
