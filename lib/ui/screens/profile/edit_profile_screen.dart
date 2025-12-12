@@ -240,6 +240,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           controller: _bioController,
                           maxLength: 60,
                           textAlign: TextAlign.center,
+                          minLines: 1,
+                          maxLines: 4, // Permitir crecimiento vertical
+                          textInputAction: TextInputAction.done,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 18,
@@ -251,6 +254,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             border: InputBorder.none,
                             counterText:
                                 '', // Ocultar contador por limpieza visual
+                            isDense: true,
                           ),
                         ),
                         const Divider(color: Colors.white10, height: 30),
