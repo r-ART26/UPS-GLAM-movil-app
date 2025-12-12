@@ -7,6 +7,8 @@ import '../../theme/typography.dart';
 import '../../widgets/dialogs/confirm_dialog.dart';
 import '../../widgets/like_button.dart';
 import '../../../services/posts/comment_service.dart';
+import '../../../services/posts/post_service.dart';
+import '../../widgets/feedback/glam_toast.dart';
 import '../../widgets/full_screen_image_viewer.dart';
 import 'post_detail_controller.dart';
 
@@ -30,11 +32,15 @@ class PostDetailScreen extends StatefulWidget {
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
   late final PostDetailController _controller;
+  late String _description;
+  bool _isDeleting = false;
+  bool _isUpdatingDesc = false;
 
   @override
   void initState() {
     super.initState();
     _controller = PostDetailController(postId: widget.postId);
+    _description = widget.description;
   }
 
   @override
@@ -119,6 +125,90 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         );
       },
     );
+  }
+
+  Future<void> _confirmDelete() async {
+    if (_isDeleting) return;
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: 'Eliminar post',
+      message: '¿Quieres eliminar este post? Esta acción no se puede deshacer.',
+      confirmText: 'Eliminar',
+      cancelText: 'Cancelar',
+      confirmColor: Colors.redAccent,
+    );
+    if (confirmed != true) return;
+
+    setState(() => _isDeleting = true);
+    try {
+      await PostService.deletePost(widget.postId);
+      if (mounted) {
+        GlamToast.showSuccess(context, 'Post eliminado correctamente');
+        Navigator.of(context).pop(true);
+      }
+    } catch (e) {
+      if (mounted) {
+        GlamToast.showError(context, 'Error al eliminar: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _isDeleting = false);
+    }
+  }
+
+  Future<void> _promptEditDescription() async {
+    if (_isUpdatingDesc) return;
+    final controller = TextEditingController(text: _description);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: AppColors.darkBackground,
+          title: const Text('Editar descripción'),
+          content: TextField(
+            controller: controller,
+            maxLines: 3,
+            autofocus: true,
+            style: const TextStyle(color: Colors.white),
+            decoration: const InputDecoration(
+              hintText: 'Escribe la nueva descripción',
+              hintStyle: TextStyle(color: Colors.white54),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, controller.text),
+              child: const Text('Guardar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == null) return;
+    final trimmed = result.trim();
+    if (trimmed.isEmpty) {
+      GlamToast.showError(context, 'La descripción no puede estar vacía');
+      return;
+    }
+
+    setState(() => _isUpdatingDesc = true);
+    try {
+      await PostService.updateDescription(widget.postId, trimmed);
+      if (mounted) {
+        setState(() => _description = trimmed);
+        GlamToast.showSuccess(context, 'Descripción actualizada');
+      }
+    } catch (e) {
+      if (mounted) {
+        GlamToast.showError(context, 'Error al actualizar: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _isUpdatingDesc = false);
+    }
   }
 
   void _showCommentInput(BuildContext context) {
@@ -215,299 +305,353 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        flexibleSpace: ClipRRect(
-          child: BackdropFilter(
-            filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10), // Glass effect
-            child: Container(color: Colors.black.withOpacity(0.2)),
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final isOwner = _controller.currentUserId != null &&
+            _controller.currentUserId == widget.authorUid;
+
+        return Scaffold(
+          extendBodyBehindAppBar: true,
+          appBar: AppBar(
+            flexibleSpace: ClipRRect(
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10), // Glass effect
+                child: Container(color: Colors.black.withOpacity(0.2)),
+              ),
+            ),
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            iconTheme: const IconThemeData(color: Colors.white),
+            title: const Text('Comentarios', style: AppTypography.h3),
+            actions: [
+              if (isOwner)
+                IconButton(
+                  icon: _isDeleting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.upsYellow,
+                          ),
+                        )
+                      : const Icon(Icons.delete_outline),
+                  onPressed: _isDeleting ? null : _confirmDelete,
+                ),
+            ],
           ),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text('Comentarios', style: AppTypography.h3),
-      ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 80), // Levantar FAB sobre NavBar
-        child: FloatingActionButton(
-          onPressed: () => _showCommentInput(context),
-          backgroundColor: AppColors.upsYellow,
-          child: const Icon(Icons.chat_bubble_outline, color: Colors.black),
-        ),
-      ),
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppGradients.darkBackground),
-        child: Column(
-          children: [
-            // 1. Contenido del Post (Scrollable)
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.only(
-                  bottom: 200,
-                ), // Espacio para el FAB flotante
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Espacio para la AppBar transparente (SafeArea manual)
-                    SizedBox(
-                      height:
-                          kToolbarHeight + MediaQuery.of(context).padding.top,
-                    ),
-
-                    // Imagen Hero (Animación suave desde el feed)
-                    // Imagen Hero (con Zoom)
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => FullScreenImageViewer(
-                              imageUrl: widget.imageUrl,
-                              heroTag: widget.postId,
-                            ),
-                          ),
-                        );
-                      },
-                      child: Hero(
-                        tag: widget.postId,
-                        child: Image.network(
-                          widget.imageUrl,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
+          floatingActionButton: Padding(
+            padding: const EdgeInsets.only(bottom: 80), // Levantar FAB sobre NavBar
+            child: FloatingActionButton(
+              onPressed: () => _showCommentInput(context),
+              backgroundColor: AppColors.upsYellow,
+              child: const Icon(Icons.chat_bubble_outline, color: Colors.black),
+            ),
+          ),
+          body: Container(
+            decoration: const BoxDecoration(gradient: AppGradients.darkBackground),
+            child: Column(
+              children: [
+                // 1. Contenido del Post (Scrollable)
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.only(
+                      bottom: 200,
+                    ), // Espacio para el FAB flotante
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Espacio para la AppBar transparente (SafeArea manual)
+                        SizedBox(
+                          height:
+                              kToolbarHeight + MediaQuery.of(context).padding.top,
                         ),
-                      ),
-                    ),
 
-                    // Descripción Original
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                      decoration: const BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(color: Colors.white12),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Nombre Autor (Clicable)
-                          GestureDetector(
-                            onTap: () {
-                              GoRouter.of(
-                                context,
-                              ).push('/profile/${widget.authorUid}');
-                            },
-                            child: _UserNameFetcher(uid: widget.authorUid),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(widget.description, style: AppTypography.body),
-                          const SizedBox(height: 12),
-
-                          // Botón para dar like y ver Likes
-                          Row(
-                            children: [
-                              // Botón de like con animación
-                              LikeButton(
-                                postId: widget.postId,
-                                initialLikesCount: 0,
-                                iconSize: 20,
-                                likedColor: AppColors.upsYellow,
-                                unlikedColor: Colors.white54,
-                                showCount: false,
-                              ),
-                              const SizedBox(width: 8),
-                              // Contador de likes y botón para ver lista
-                              GestureDetector(
-                                onTap: () => _showLikesModal(context),
-                                child: StreamBuilder<DocumentSnapshot>(
-                                  stream: _controller.postStream,
-                                  builder: (context, postSnapshot) {
-                                    int likesCount = 0;
-                                    if (postSnapshot.hasData &&
-                                        postSnapshot.data != null) {
-                                      final data =
-                                          postSnapshot.data!.data()
-                                              as Map<String, dynamic>?;
-                                      if (data != null) {
-                                        likesCount =
-                                            data['pos_likesCount'] as int? ?? 0;
-                                      }
-                                    }
-
-                                    return Text(
-                                      '$likesCount Me gusta',
-                                      style: AppTypography.caption.copyWith(
-                                        color: Colors.white54,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    );
-                                  },
+                        // Imagen Hero (Animación suave desde el feed)
+                        // Imagen Hero (con Zoom)
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => FullScreenImageViewer(
+                                  imageUrl: widget.imageUrl,
+                                  heroTag: widget.postId,
                                 ),
                               ),
-                            ],
+                            );
+                          },
+                          child: Hero(
+                            tag: widget.postId,
+                            child: Image.network(
+                              widget.imageUrl,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
                           ),
-                        ],
-                      ),
-                    ),
+                        ),
 
-                    // Sección de Comentarios (Título)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-                      child: Text(
-                        'Comentarios',
-                        style: AppTypography.h3.copyWith(fontSize: 16),
-                      ),
-                    ),
-
-                    // Lista de Comentarios en Tiempo Real
-                    StreamBuilder<QuerySnapshot>(
-                      stream: _controller.commentsStream,
-                      builder: (context, snapshot) {
-                        if (snapshot.hasError) {
-                          return const Padding(
-                            padding: EdgeInsets.all(16.0),
-                            child: Text(
-                              'Error cargando comentarios',
-                              style: TextStyle(color: Colors.red),
+                        // Descripción Original
+                        Container(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                          decoration: const BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(color: Colors.white12),
                             ),
-                          );
-                        }
-
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(20.0),
-                              child: CircularProgressIndicator(
-                                color: Colors.white24,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Nombre Autor (Clicable)
+                              GestureDetector(
+                                onTap: () {
+                                  GoRouter.of(
+                                    context,
+                                  ).push('/profile/${widget.authorUid}');
+                                },
+                                child: _UserNameFetcher(uid: widget.authorUid),
                               ),
-                            ),
-                          );
-                        }
-
-                        final docs = snapshot.data?.docs ?? [];
-
-                        if (docs.isEmpty) {
-                          return const Padding(
-                            padding: EdgeInsets.all(32.0),
-                            child: Center(
-                              child: Text(
-                                'Sin comentarios',
-                                style: TextStyle(color: Colors.white30),
-                              ),
-                            ),
-                          );
-                        }
-
-                        return ListView.builder(
-                          padding: EdgeInsets.zero,
-                          shrinkWrap:
-                              true, // Importante dentro de SingleChildScrollView
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: docs.length,
-                          itemBuilder: (context, index) {
-                            final data =
-                                docs[index].data() as Map<String, dynamic>;
-                            final commentText =
-                                data['com_text'] as String? ?? '';
-                            // Usamos el UID del autor del comentario
-                            final authorUid =
-                                data['com_authorUid'] as String? ?? '';
-                            final commentId = docs[index].id;
-                            final isOwner =
-                                _controller.currentUserId != null &&
-                                _controller.currentUserId == authorUid;
-
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 6,
-                              ),
-                              child: Column(
+                              const SizedBox(height: 4),
+                              Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: GestureDetector(
-                                          onTap: () => GoRouter.of(
-                                            context,
-                                          ).push('/profile/$authorUid'),
-                                          child: _UserNameFetcher(
-                                            uid: authorUid,
-                                          ),
-                                        ),
-                                      ),
-                                      if (isOwner)
-                                        SizedBox(
-                                          height: 24,
-                                          width: 24,
-                                          child: IconButton(
-                                            padding: EdgeInsets.zero,
-                                            icon: const Icon(
-                                              Icons.delete_outline,
-                                              size: 16,
-                                              color: Colors.white38,
-                                            ),
-                                            onPressed: () async {
-                                              final confirmed =
-                                                  await ConfirmDialog.show(
-                                                    context,
-                                                    title:
-                                                        'Eliminar comentario',
-                                                    message:
-                                                        '¿Estás seguro de que deseas eliminar este comentario?',
-                                                    confirmText: 'Eliminar',
-                                                    cancelText: 'Cancelar',
-                                                    confirmColor:
-                                                        Colors.redAccent,
-                                                  );
-
-                                              if (confirmed == true) {
-                                                await CommentService.deleteComment(
-                                                  widget.postId,
-                                                  commentId,
-                                                  context,
-                                                );
-                                              }
-                                            },
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.only(
-                                      left: 36,
-                                      top: 2,
-                                    ),
+                                  Expanded(
                                     child: Text(
-                                      commentText,
-                                      style: AppTypography.bodySmall.copyWith(
-                                        color: Colors.white70,
-                                        height: 1.3,
-                                      ),
+                                      _description,
+                                      style: AppTypography.body,
+                                    ),
+                                  ),
+                                  if (isOwner)
+                                    IconButton(
+                                      padding: EdgeInsets.zero,
+                                      visualDensity: VisualDensity.compact,
+                                      icon: _isUpdatingDesc
+                                          ? const SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: AppColors.upsYellow,
+                                              ),
+                                            )
+                                          : const Icon(
+                                              Icons.edit_outlined,
+                                              size: 18,
+                                              color: Colors.white70,
+                                            ),
+                                      onPressed:
+                                          _isUpdatingDesc ? null : _promptEditDescription,
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+
+                              // Botón para dar like y ver Likes
+                              Row(
+                                children: [
+                                  // Botón de like con animación
+                                  LikeButton(
+                                    postId: widget.postId,
+                                    initialLikesCount: 0,
+                                    iconSize: 20,
+                                    likedColor: AppColors.upsYellow,
+                                    unlikedColor: Colors.white54,
+                                    showCount: false,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  // Contador de likes y botón para ver lista
+                                  GestureDetector(
+                                    onTap: () => _showLikesModal(context),
+                                    child: StreamBuilder<DocumentSnapshot>(
+                                      stream: _controller.postStream,
+                                      builder: (context, postSnapshot) {
+                                        int likesCount = 0;
+                                        if (postSnapshot.hasData &&
+                                            postSnapshot.data != null) {
+                                          final data =
+                                              postSnapshot.data!.data()
+                                                  as Map<String, dynamic>?;
+                                          if (data != null) {
+                                            likesCount =
+                                                data['pos_likesCount'] as int? ?? 0;
+                                          }
+                                        }
+
+                                        return Text(
+                                          '$likesCount Me gusta',
+                                          style: AppTypography.caption.copyWith(
+                                            color: Colors.white54,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        );
+                                      },
                                     ),
                                   ),
                                 ],
                               ),
+                            ],
+                          ),
+                        ),
+
+                        // Sección de Comentarios (Título)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                          child: Text(
+                            'Comentarios',
+                            style: AppTypography.h3.copyWith(fontSize: 16),
+                          ),
+                        ),
+
+                        // Lista de Comentarios en Tiempo Real
+                        StreamBuilder<QuerySnapshot>(
+                          stream: _controller.commentsStream,
+                          builder: (context, snapshot) {
+                            if (snapshot.hasError) {
+                              return const Padding(
+                                padding: EdgeInsets.all(16.0),
+                                child: Text(
+                                  'Error cargando comentarios',
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                              );
+                            }
+
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(20.0),
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white24,
+                                  ),
+                                ),
+                              );
+                            }
+
+                            final docs = snapshot.data?.docs ?? [];
+
+                            if (docs.isEmpty) {
+                              return const Padding(
+                                padding: EdgeInsets.all(32.0),
+                                child: Center(
+                                  child: Text(
+                                    'Sin comentarios',
+                                    style: TextStyle(color: Colors.white30),
+                                  ),
+                                ),
+                              );
+                            }
+
+                            return ListView.builder(
+                              padding: EdgeInsets.zero,
+                              shrinkWrap:
+                                  true, // Importante dentro de SingleChildScrollView
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: docs.length,
+                              itemBuilder: (context, index) {
+                                final data =
+                                    docs[index].data() as Map<String, dynamic>;
+                                final commentText =
+                                    data['com_text'] as String? ?? '';
+                                // Usamos el UID del autor del comentario
+                                final authorUid =
+                                    data['com_authorUid'] as String? ?? '';
+                                final commentId = docs[index].id;
+                                final isOwnerComment =
+                                    _controller.currentUserId != null &&
+                                    _controller.currentUserId == authorUid;
+
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 6,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            child: GestureDetector(
+                                              onTap: () => GoRouter.of(
+                                                context,
+                                              ).push('/profile/$authorUid'),
+                                              child: _UserNameFetcher(
+                                                uid: authorUid,
+                                              ),
+                                            ),
+                                          ),
+                                          if (isOwnerComment)
+                                            SizedBox(
+                                              height: 24,
+                                              width: 24,
+                                              child: IconButton(
+                                                padding: EdgeInsets.zero,
+                                                icon: const Icon(
+                                                  Icons.delete_outline,
+                                                  size: 16,
+                                                  color: Colors.white38,
+                                                ),
+                                                onPressed: () async {
+                                                  final confirmed =
+                                                      await ConfirmDialog.show(
+                                                        context,
+                                                        title: 'Eliminar comentario',
+                                                        message:
+                                                            '¿Estás seguro de que deseas eliminar este comentario?',
+                                                        confirmText: 'Eliminar',
+                                                        cancelText: 'Cancelar',
+                                                        confirmColor:
+                                                            Colors.redAccent,
+                                                      );
+
+                                                  if (confirmed == true) {
+                                                    await CommentService.deleteComment(
+                                                      widget.postId,
+                                                      commentId,
+                                                      context,
+                                                    );
+                                                  }
+                                                },
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          left: 36,
+                                          top: 2,
+                                        ),
+                                        child: Text(
+                                          commentText,
+                                          style: AppTypography.bodySmall.copyWith(
+                                            color: Colors.white70,
+                                            height: 1.3,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
                             );
                           },
-                        );
-                      },
-                    ),
+                        ),
 
-                    // Espacio extra para que el teclado no tape el último comentario
-                    const SizedBox(height: 80),
-                  ],
+                        // Espacio extra para que el teclado no tape el último comentario
+                        const SizedBox(height: 80),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

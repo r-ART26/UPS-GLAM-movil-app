@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import '../../theme/colors.dart';
 import '../../widgets/design_system/glam_input.dart';
 
@@ -21,6 +22,12 @@ class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounceTimer;
   String _currentQuery = '';
+  static const List<_TileSpan> _pattern = [
+    _TileSpan(1, 1),
+    _TileSpan(1, 1),
+    _TileSpan(1, 1),
+    _TileSpan(2, 2),
+  ];
 
   @override
   void dispose() {
@@ -114,64 +121,65 @@ class _SearchScreenState extends State<SearchScreen> {
 
         final posts = snapshot.data!;
 
-        return GridView.builder(
-          padding: const EdgeInsets.all(2),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            mainAxisSpacing: 2,
-            crossAxisSpacing: 2,
-          ),
-          itemCount: posts.length,
-          itemBuilder: (context, index) {
+        return StaggeredGrid.count(
+          crossAxisCount: 3,
+          mainAxisSpacing: 2,
+          crossAxisSpacing: 2,
+          children: List.generate(posts.length, (index) {
             final post = posts[index];
             final imageUrl = post['imageUrl'] as String;
+            final span = _pattern[index % _pattern.length];
 
-            return GestureDetector(
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => PostDetailScreen(
-                      postId: post['postId'],
-                      imageUrl: imageUrl,
-                      description: post['description'],
-                      authorUid: post['authorUid'],
-                    ),
-                  ),
-                );
-              },
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.cover,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Container(
-                      color: Colors.white.withOpacity(0.1),
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded /
-                                    loadingProgress.expectedTotalBytes!
-                              : null,
-                          color: Colors.white24,
-                          strokeWidth: 2,
-                        ),
+            return StaggeredGridTile.count(
+              crossAxisCellCount: span.cross,
+              mainAxisCellCount: span.main,
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => PostDetailScreen(
+                        postId: post['postId'],
+                        imageUrl: imageUrl,
+                        description: post['description'],
+                        authorUid: post['authorUid'],
                       ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    color: Colors.white.withOpacity(0.1),
-                    child: const Icon(
-                      Icons.broken_image,
-                      color: Colors.white24,
-                      size: 24,
+                    ),
+                  );
+                },
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Container(
+                        color: Colors.white.withOpacity(0.1),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
+                                : null,
+                            color: Colors.white24,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      color: Colors.white.withOpacity(0.1),
+                      child: const Icon(
+                        Icons.broken_image,
+                        color: Colors.white24,
+                        size: 24,
+                      ),
                     ),
                   ),
                 ),
               ),
             );
-          },
+          }),
         );
       },
     );
@@ -221,4 +229,11 @@ class _SearchScreenState extends State<SearchScreen> {
       ),
     );
   }
+}
+
+/// Span helper para definir el patrón de mosaico
+class _TileSpan {
+  final int cross;
+  final int main;
+  const _TileSpan(this.cross, this.main);
 }

@@ -8,7 +8,6 @@ import '../../widgets/like_button.dart';
 import '../post/post_detail_screen.dart';
 import 'feed_controller.dart';
 import '../../../models/feed_post_model.dart';
-import '../../widgets/design_system/glam_button.dart';
 
 /// Pantalla principal (Feed) con arquitectura separada (MVC) y Paginación.
 class FeedScreen extends StatefulWidget {
@@ -60,8 +59,7 @@ class _FeedScreenState extends State<FeedScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
               child: Row(
-                mainAxisAlignment:
-                    MainAxisAlignment.spaceBetween, // Separar logo y acciones
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
                   // Marca UPStagram
                   Row(
@@ -79,16 +77,6 @@ class _FeedScreenState extends State<FeedScreen> {
                         ),
                       ),
                     ],
-                  ),
-
-                  // Botón de notificaciones (placeholder por ahora)
-                  IconButton(
-                    onPressed: () {}, // TODO: Implementar notificaciones
-                    icon: Icon(
-                      Icons.notifications_outlined,
-                      color: Colors.white70,
-                    ),
-                    splashRadius: 24,
                   ),
                 ],
               ),
@@ -240,8 +228,8 @@ class _FeedScreenState extends State<FeedScreen> {
 
   Widget _buildPostCard(BuildContext context, FeedPost post) {
     return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
+      onTap: () async {
+        final deleted = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (context) => PostDetailScreen(
               postId: post.id,
@@ -251,6 +239,14 @@ class _FeedScreenState extends State<FeedScreen> {
             ),
           ),
         );
+        if (deleted == true) {
+          await _controller.refresh();
+          _scrollController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 24),
@@ -339,15 +335,42 @@ class _FeedScreenState extends State<FeedScreen> {
                   // Barra de Acciones
                   Row(
                     children: [
-                      LikeButton(
-                        postId: post.id,
-                        initialLikesCount: post.likesCount,
-                        iconSize: 26,
-                        likedColor: AppColors.upsYellow, // Gold heart
-                        unlikedColor: Colors.white70,
-                        countStyle: AppTypography.body.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                      // Desacoplamos el contador del botón para evitar parpadeos
+                      Row(
+                        children: [
+                          LikeButton(
+                            postId: post.id,
+                            initialLikesCount: post.likesCount,
+                            iconSize: 26,
+                            likedColor: AppColors.upsYellow, // Gold heart
+                            unlikedColor: Colors.white70,
+                            showCount: false,
+                          ),
+                          const SizedBox(width: 8),
+                          StreamBuilder<DocumentSnapshot>(
+                            stream: FirebaseFirestore.instance
+                                .collection('Posts')
+                                .doc(post.id)
+                                .snapshots(),
+                            builder: (context, snapshot) {
+                              int likesCount = post.likesCount;
+                              if (snapshot.hasData && snapshot.data != null) {
+                                final data =
+                                    snapshot.data!.data() as Map<String, dynamic>?;
+                                if (data != null) {
+                                  likesCount = data['pos_likesCount'] as int? ?? post.likesCount;
+                                }
+                              }
+
+                              return Text(
+                                '$likesCount',
+                                style: AppTypography.body.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ),
                       const SizedBox(width: 20),
                       GestureDetector(

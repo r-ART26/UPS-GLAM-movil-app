@@ -13,6 +13,7 @@ import '../../widgets/dialogs/error_dialog.dart';
 import '../../../services/image/temp_image_service.dart';
 import '../../../services/image/image_processing_service.dart';
 import '../../../services/posts/post_service.dart';
+import '../../widgets/feedback/glam_toast.dart';
 
 class NewPostScreen extends StatefulWidget {
   const NewPostScreen({super.key, this.autoLoadTempImage = false});
@@ -551,20 +552,18 @@ class _NewPostScreenState extends State<NewPostScreen> {
       }
 
       if (mounted) {
+        GlamToast.showSuccess(context, 'Post publicado correctamente');
         context.go('/home/feed');
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _isPublishing = false;
-        });
-        await ErrorDialog.show(
+        GlamToast.showError(
           context,
-          title: 'Error al publicar',
-          message:
-              'Ocurrió un error al intentar publicar tu post: ${e.toString()}',
+          'Error al publicar: ${e.toString()}',
         );
       }
+    } finally {
+      if (mounted) setState(() => _isPublishing = false);
     }
   }
 
