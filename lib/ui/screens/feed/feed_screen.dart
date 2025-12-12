@@ -8,7 +8,6 @@ import '../../widgets/like_button.dart';
 import '../post/post_detail_screen.dart';
 import 'feed_controller.dart';
 import '../../../models/feed_post_model.dart';
-import '../../widgets/design_system/glam_button.dart';
 
 /// Pantalla principal (Feed) con arquitectura separada (MVC) y Paginación.
 class FeedScreen extends StatefulWidget {
@@ -240,8 +239,8 @@ class _FeedScreenState extends State<FeedScreen> {
 
   Widget _buildPostCard(BuildContext context, FeedPost post) {
     return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
+      onTap: () async {
+        final deleted = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (context) => PostDetailScreen(
               postId: post.id,
@@ -251,6 +250,14 @@ class _FeedScreenState extends State<FeedScreen> {
             ),
           ),
         );
+        if (deleted == true) {
+          await _controller.refresh();
+          _scrollController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 24),

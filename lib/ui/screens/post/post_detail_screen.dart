@@ -144,7 +144,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       await PostService.deletePost(widget.postId);
       if (mounted) {
         GlamToast.showSuccess(context, 'Post eliminado correctamente');
-        Navigator.of(context).pop();
+        Navigator.of(context).pop(true);
       }
     } catch (e) {
       if (mounted) {
