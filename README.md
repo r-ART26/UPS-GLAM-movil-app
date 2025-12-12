@@ -314,6 +314,87 @@ flutter run -d <device-id>
 - **Spring Boot** - Servidor backend REST API
 - **JWT** - Autenticación mediante tokens
 
+## Diagramas
+
+### Arquitectura General
+``` mermaid
+graph TD
+    User((Usuario UPS))
+    
+    subgraph Mobile Device
+        App[UPS GLAM App<br/>Flutter]
+        LocalDB[(Shared Preferences<br/>Token JWT)]
+    end
+    
+    subgraph Cloud Backend
+        Firebase[Firebase Firestore]
+        Storage[SupaBase]
+    end
+    
+    subgraph Local Server Infrastructure
+        SpringBoot[Spring Boot Server<br/>Auth & Logic]
+        GPU_Service[FastAPI Service<br/>Vision Processing GPU]
+    end
+
+    %% Flujo de Autenticación
+    User -.->|Credenciales| App
+    App -->|LOGIN POST /api/auth| SpringBoot
+    SpringBoot -->|Retorna JWT| App
+    App -->|Guarda Token| LocalDB
+
+    %% Flujo de Datos (CQRS)
+    App -->|LEER Feed/Perfil Realtime| Firebase
+    App -->|CREAR Post Multipart| SpringBoot
+    
+    %% Procesamiento Backend
+    SpringBoot -->|Procesa Imagen| GPU_Service
+    SpringBoot -->|Guarda/Sincroniza| Firebase
+    SpringBoot -->|Sube Imagen| Storage
+```
+
+### Flujo de Login y Sesión
+``` mermaid
+sequenceDiagram
+    participant User
+    participant App as UPS GLAM App
+    participant Back as Spring Boot API
+    participant Prefs as feed
+
+    User->>App: Ingresa usuario/pass
+    App->>Back: POST /api/auth/login
+    
+    alt Credenciales Válidas
+        Back-->>App: 200 OK + {JWT Token}
+        App->>Prefs: saveToken(jwt)
+        App->>User: Redirige al Home
+    else Credenciales Inválidas
+        Back-->>App: 401 Unauthorized
+        App->>User: Muestra Error
+    end
+```
+
+### Flujo Híbrido: Crear Post vs. Leer Feed
+```mermaid
+sequenceDiagram
+    participant App
+    participant SS as Spring Boot (Local)
+    participant FB as Firestore (Cloud)
+
+    Note over App, FB: LECTURA (Rápida)
+    App->>FB: Suscripción a colección 'Posts'
+    FB-->>App: Stream de Datos (Nuevos posts)
+
+    Note over App, SS: ESCRITURA (Procesada)
+    App->>SS: POST /api/posts (Imagen + Caption)
+    activate SS
+    SS->>SS: Validar JWT
+    SS->>SS: Aplicar Visión Computarizada
+    SS->>FB: Crear Documento {pos_caption, ...}
+    deactivate SS
+    
+    FB-->>App: Notificación Realtime (Nuevo Post aparece)
+```
+
 ## 📝 Notas Adicionales
 
 ### Permisos Requeridos (Android)
