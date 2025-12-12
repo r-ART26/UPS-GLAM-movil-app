@@ -8,6 +8,7 @@ Aplicación móvil desarrollada en Flutter para compartir fotografías con la co
 - [Requisitos Previos](#-requisitos-previos)
 - [Instalación](#-instalación)
 - [Configuración](#-configuración)
+- [Arquitectura](#-arquitectura-vista-lógica)
 - [Archivos Sensibles](#-archivos-sensibles)
 - [Configuración del Icono](#-configuración-del-icono)
 - [Estructura del Proyecto](#-estructura-del-proyecto)
@@ -73,6 +74,44 @@ La configuración se guarda localmente y se utiliza para todas las peticiones al
 
 - `lib/firebase_options.dart` y `android/app/google-services.json` deben provenir de tu proyecto de Firebase.
 - Habilita **Cloud Firestore** y configura reglas/acceso según tu entorno (se usa para feed, likes y búsqueda).
+
+## 🏗️ Arquitectura (vista lógica)
+
+```mermaid
+flowchart LR
+  subgraph Client["Flutter App"]
+    UI["UI (GoRouter + Shell):\nWelcome/Login/Register\nFeed / Search / Post / Profile"]
+    Theme["AppTheme & DS"]
+    State["Controllers/State\n(FeedController, etc.)"]
+    Services["Services layer:\n- AuthService (JWT en prefs)\n- AppConfigService (IP backend)\n- ApiService (HTTP)\n- ImageProcessingService (Dio/multipart)\n- PostService / UserSearchService\n- TempImageService"]
+  end
+
+  subgraph Infra["Infra de datos"]
+    Firestore["Firebase Firestore\n(feed, likes, búsqueda, contadores)"]
+    Storage["(Imágenes servidas vía URLs\nprovenientes de backend/storage)"]
+  end
+
+  subgraph Backend["Backend"]
+    Spring["Spring Boot API\nAuth / Posts / Users"]
+    FastAPI["VisionProcessingGPU-Kit\n(filtros de imagen)"]
+  end
+
+  subgraph Local["Dispositivo"]
+    Prefs["SharedPreferences\n(JWT + IP backend)"]
+  end
+
+  UI --> State
+  State --> Services
+  Services --> Prefs
+  Services --> Firestore
+  Services --> Spring
+  Services --> FastAPI
+
+  Spring <--> FastAPI
+  Spring --> Firestore:::opt
+
+  classDef opt fill:#0b486b,stroke:#0b486b,color:#fff;
+```
 
 ## 🔒 Archivos Sensibles
 
