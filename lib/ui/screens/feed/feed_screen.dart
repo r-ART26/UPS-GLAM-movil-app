@@ -59,8 +59,7 @@ class _FeedScreenState extends State<FeedScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
               child: Row(
-                mainAxisAlignment:
-                    MainAxisAlignment.spaceBetween, // Separar logo y acciones
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
                   // Marca UPStagram
                   Row(
@@ -78,16 +77,6 @@ class _FeedScreenState extends State<FeedScreen> {
                         ),
                       ),
                     ],
-                  ),
-
-                  // Botón de notificaciones (placeholder por ahora)
-                  IconButton(
-                    onPressed: () {}, // TODO: Implementar notificaciones
-                    icon: Icon(
-                      Icons.notifications_outlined,
-                      color: Colors.white70,
-                    ),
-                    splashRadius: 24,
                   ),
                 ],
               ),
@@ -346,15 +335,42 @@ class _FeedScreenState extends State<FeedScreen> {
                   // Barra de Acciones
                   Row(
                     children: [
-                      LikeButton(
-                        postId: post.id,
-                        initialLikesCount: post.likesCount,
-                        iconSize: 26,
-                        likedColor: AppColors.upsYellow, // Gold heart
-                        unlikedColor: Colors.white70,
-                        countStyle: AppTypography.body.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                      // Desacoplamos el contador del botón para evitar parpadeos
+                      Row(
+                        children: [
+                          LikeButton(
+                            postId: post.id,
+                            initialLikesCount: post.likesCount,
+                            iconSize: 26,
+                            likedColor: AppColors.upsYellow, // Gold heart
+                            unlikedColor: Colors.white70,
+                            showCount: false,
+                          ),
+                          const SizedBox(width: 8),
+                          StreamBuilder<DocumentSnapshot>(
+                            stream: FirebaseFirestore.instance
+                                .collection('Posts')
+                                .doc(post.id)
+                                .snapshots(),
+                            builder: (context, snapshot) {
+                              int likesCount = post.likesCount;
+                              if (snapshot.hasData && snapshot.data != null) {
+                                final data =
+                                    snapshot.data!.data() as Map<String, dynamic>?;
+                                if (data != null) {
+                                  likesCount = data['pos_likesCount'] as int? ?? post.likesCount;
+                                }
+                              }
+
+                              return Text(
+                                '$likesCount',
+                                style: AppTypography.body.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ),
                       const SizedBox(width: 20),
                       GestureDetector(
