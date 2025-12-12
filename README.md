@@ -1,6 +1,6 @@
-# UPStagram
+# UPStagram 1.0 (UPS GLAM)
 
-Aplicación móvil desarrollada en Flutter para compartir fotografías con la comunidad UPS. La aplicación permite aplicar filtros avanzados a las imágenes, publicar posts y gestionar un perfil de usuario.
+Aplicación móvil desarrollada en Flutter para compartir fotografías con la comunidad UPS. La app integra filtros avanzados via backend, feed social en tiempo real y gestión de perfil.
 
 ## 📋 Tabla de Contenidos
 
@@ -18,7 +18,7 @@ Aplicación móvil desarrollada en Flutter para compartir fotografías con la co
 
 - 🔐 **Autenticación JWT**: Sistema de login y registro seguro
 - 📷 **Gestión de Imágenes**: Selección desde cámara o galería
-- 🎨 **Filtros Avanzados**: Aplicación de múltiples filtros de procesamiento de imágenes:
+- 🎨 **Filtros Avanzados (backend)**: Aplicación de múltiples filtros de procesamiento de imágenes:
   - Canny (detección de bordes)
   - Gaussian (desenfoque)
   - Negative (negativo)
@@ -26,17 +26,20 @@ Aplicación móvil desarrollada en Flutter para compartir fotografías con la co
   - Watermark (marca de agua)
   - Ripple (ondas)
   - Collage (collage)
-- 📱 **Feed de Publicaciones**: Visualización de posts de la comunidad
+- ⚡ **Feed en tiempo real**: Publicaciones, likes y contadores servidos desde Firestore
+- 🔎 **Búsqueda**: Explorador tipo Instagram con cuadrícula dinámica (StaggeredGridView)
+- 📱 **Feed de Publicaciones**: Visualización y detalle de posts de la comunidad
 - 👤 **Perfil de Usuario**: Gestión de perfil con estadísticas
-- 🌐 **Conexión a Backend**: Integración con servidor Spring Boot en red local
+- 🌐 **Conexión a Backend**: Integración con servidor Spring Boot + microservicio FastAPI en red local
+- 🧭 **Navegación con GoRouter**: Shell de navegación con rutas públicas y privadas
 
 ## 🔧 Requisitos Previos
 
 - Flutter SDK (versión 3.10.3 o superior)
 - Dart SDK (versión 3.10.3 o superior)
 - Android Studio / Xcode (para desarrollo móvil)
-- Servidor Spring Boot ejecutándose en la red local
-- Cuenta de Firebase configurada
+- Servidor Spring Boot ejecutándose en la red local (y el microservicio VisionProcessingGPU-Kit accesible)
+- Cuenta de Firebase configurada con **Firestore habilitado**
 
 ## 📦 Instalación
 
@@ -65,6 +68,11 @@ Al iniciar la aplicación por primera vez, se te pedirá ingresar la dirección 
 - Si tu servidor Spring Boot está en `http://192.168.1.100:8080`, ingresa: `192.168.1.100`
 
 La configuración se guarda localmente y se utiliza para todas las peticiones al backend.
+
+### Configuración de Firebase/Firestore
+
+- `lib/firebase_options.dart` y `android/app/google-services.json` deben provenir de tu proyecto de Firebase.
+- Habilita **Cloud Firestore** y configura reglas/acceso según tu entorno (se usa para feed, likes y búsqueda).
 
 ## 🔒 Archivos Sensibles
 
@@ -187,6 +195,7 @@ UPS-GLAM-movil-app/
 │   │   │   └── auth_middleware.dart  # Middleware de autenticación
 │   │   ├── config/
 │   │   │   └── app_config_service.dart  # Configuración del servidor
+│   │   ├── users/           # Búsqueda de usuarios y perfiles
 │   │   ├── image/
 │   │   │   ├── image_processing_service.dart  # Procesamiento de filtros
 │   │   │   └── temp_image_service.dart  # Gestión de imágenes temporales
@@ -225,6 +234,8 @@ flutter build apk
 flutter install
 ```
 
+El APK de producción queda en `build/app/outputs/flutter-apk/app-release.apk`.
+
 ### Modo Release (iOS)
 
 ```bash
@@ -249,12 +260,15 @@ flutter run -d <device-id>
 
 ### Dependencias Principales
 - **firebase_core** ^4.2.1 - Integración con Firebase
+- **cloud_firestore** ^6.1.0 - Feed, likes y búsquedas en tiempo real
 - **go_router** ^14.2.0 - Navegación y routing
-- **shared_preferences** ^2.2.2 - Almacenamiento local
-- **http** ^1.1.0 - Cliente HTTP básico
-- **dio** ^5.4.0 - Cliente HTTP avanzado (multipart, cancelación)
+- **shared_preferences** ^2.2.2 - Almacenamiento local (token e IP backend)
+- **http** ^1.1.0 / **dio** ^5.4.0 - Clientes HTTP (REST + multipart)
 - **image_picker** ^1.0.7 - Selección de imágenes desde cámara/galería
-- **path_provider** ^2.1.1 - Gestión de rutas del sistema
+- **path_provider** ^2.1.1 / **path** ^1.8.3 - Manejo de rutas y archivos
+- **network_info_plus** ^5.0.0 - Utilidades de red local
+- **flutter_staggered_grid_view** ^0.7.0 - Cuadrículas estilo explorador
+- **intl** ^0.20.2 - Formateo de fechas/valores
 - **flutter_launcher_icons** ^0.13.1 - Generación de iconos
 
 ### Backend
