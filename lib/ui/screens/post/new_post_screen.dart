@@ -172,24 +172,24 @@ class _NewPostScreenState extends State<NewPostScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'Seleccionar imagen',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: AppColors.textWhite),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.camera_alt, color: Colors.white),
+              leading: const Icon(Icons.camera_alt, color: AppColors.textWhite),
               title: const Text(
                 'Tomar foto',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: AppColors.textWhite),
               ),
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library, color: Colors.white),
+              leading: const Icon(Icons.photo_library, color: AppColors.textWhite),
               title: const Text(
                 'Desde galería',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: AppColors.textWhite),
               ),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
@@ -408,7 +408,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
           result = await ImageProcessingService.applyRipple(
             _originalImage!,
             edgeThreshold: _toDouble(params?['edge_threshold']),
-            colorLevels: _toInt(params?['color_levels']),
+            colorLevels: 4,
             saturation: _toDouble(params?['saturation']),
           );
           break;
@@ -587,7 +587,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
       },
       child: Container(
         decoration: const BoxDecoration(
-          gradient: AppGradients.welcomeBackground,
+          gradient: AppGradients.darkBackground,
         ),
         child: SafeArea(
           child: Column(
@@ -628,7 +628,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(
-            icon: const Icon(Icons.close, color: Colors.white),
+            icon: const Icon(Icons.close, color: AppColors.textWhite),
             onPressed: () {
               if (context.canPop()) {
                 context.pop();
@@ -649,7 +649,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
                   shape: BoxShape.circle,
                   color: index == _currentStep
                       ? AppColors.upsYellow
-                      : Colors.white.withOpacity(0.3),
+                      : AppColors.textWhite.withOpacity(0.3),
                 ),
               );
             }),
@@ -692,7 +692,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
               onPressed: _openCamera,
               child: const Text(
                 'Abrir cámara',
-                style: TextStyle(color: Colors.white70),
+                style: TextStyle(color: AppColors.textGrayLight),
               ),
             ),
           ],
@@ -707,7 +707,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
       return const Center(
         child: Text(
           'Por favor, selecciona una imagen primero',
-          style: TextStyle(color: Colors.white70),
+          style: TextStyle(color: AppColors.textGrayLight),
         ),
       );
     }
@@ -804,16 +804,16 @@ class _NewPostScreenState extends State<NewPostScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white38),
+          border: Border.all(color: AppColors.glassBorder),
             ),
             child: TextField(
               controller: _captionController,
               focusNode: _captionFocusNode,
               maxLines: 5,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                hintText: 'Escribe algo sobre tu foto',
-                hintStyle: TextStyle(color: Colors.white54),
+          style: const TextStyle(color: AppColors.textWhite),
+          decoration: const InputDecoration(
+            hintText: 'Escribe algo sobre tu foto',
+            hintStyle: TextStyle(color: AppColors.textGray),
                 border: InputBorder.none,
                 focusedBorder: InputBorder.none,
                 enabledBorder: InputBorder.none,
@@ -846,17 +846,17 @@ class _NewPostScreenState extends State<NewPostScreen> {
                         vertical: 10,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
+                      color: AppColors.glassWhite,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.3),
+                        color: AppColors.glassBorder,
                           width: 1,
                         ),
                       ),
                       child: Text(
                         caption,
                         style: const TextStyle(
-                          color: Colors.white,
+                        color: AppColors.textWhite,
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                         ),
@@ -904,9 +904,9 @@ class _NewPostScreenState extends State<NewPostScreen> {
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
-          color: Colors.white.withAlpha(40),
+          color: AppColors.glassWhite,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white38),
+          border: Border.all(color: AppColors.glassBorder),
         ),
         child: const Center(
           child: Column(
@@ -915,12 +915,12 @@ class _NewPostScreenState extends State<NewPostScreen> {
               Icon(
                 Icons.add_photo_alternate_outlined,
                 size: 60,
-                color: Colors.white70,
+                color: AppColors.textGrayLight,
               ),
               SizedBox(height: 12),
               Text(
                 'Toca para seleccionar imagen',
-                style: TextStyle(color: Colors.white70, fontSize: 16),
+                style: TextStyle(color: AppColors.textGrayLight, fontSize: 16),
               ),
             ],
           ),
@@ -935,7 +935,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
       width: double.infinity,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white38, width: 2),
+        border: Border.all(color: AppColors.glassBorder, width: 2),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
@@ -950,19 +950,19 @@ class _NewPostScreenState extends State<NewPostScreen> {
       return Container(
         width: double.infinity,
         decoration: BoxDecoration(
-          color: Colors.white.withAlpha(40),
+          color: AppColors.glassWhite,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white38),
+          border: Border.all(color: AppColors.glassBorder),
         ),
         child: const Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircularProgressIndicator(color: Colors.white),
+              CircularProgressIndicator(color: AppColors.upsYellow),
               SizedBox(height: 16),
               Text(
                 'Aplicando filtro...',
-                style: TextStyle(color: Colors.white70),
+                style: TextStyle(color: AppColors.textGrayLight),
               ),
             ],
           ),
@@ -985,7 +985,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
       width: double.infinity,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white38, width: 2),
+        border: Border.all(color: AppColors.glassBorder, width: 2),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
